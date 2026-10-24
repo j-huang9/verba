@@ -152,6 +152,12 @@ def open_camera(index: int):
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     if not cap.isOpened():
         sys.exit(f"Could not open camera {index}. Try --cam 1, and check macOS camera permission for your terminal.")
+    # Continuity Camera (iPhone) returns no frames for the first second or two while it wakes up.
+    deadline = time.time() + 5
+    while not cap.read()[0]:
+        if time.time() > deadline:
+            sys.exit(f"Camera {index} opened but sent no frames. Unlock the iPhone, keep it near the Mac, or try another --cam.")
+        time.sleep(0.1)
     return cap
 
 
