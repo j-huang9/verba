@@ -129,7 +129,128 @@ Every phrase is **pre-generated** in the cloned voice and committed as `web/publ
 
 API alternative to step 3: `curl -X POST https://api.cartesia.ai/voices/clone -H "Authorization: Bearer $KEY" -H "Cartesia-Version: 2026-08-14" -F clip=@clip.wav -F name="Patient" -F language=en`. The new voice is the `id` in the response.
 
-Stretch (C, Saturday, only if the core is solid): **live cloning in the app.** The family uploads a video, a Vercel function calls `/voices/clone` and then `/tts/bytes` with the key kept server-side, and the app caches the mp3s. It's great for the Cartesia track, but it needs network, so keep the pre-generated voice as the demo default.
+**Live cloning in the app (A, Saturday; see "Saturday build").** The family uploads a video, a Vercel function calls `/voices/clone` and then `/tts/bytes` with the key kept server-side, and the app caches the mp3s. It's great for the Cartesia track, but it needs network, so keep the pre-generated voice as the demo default.
+
+## Saturday build (current plan: replaces the Saturday blocks below)
+
+The app grows from one camera screen into a full app: home screen, add a patient, give them their voice (live cloning), teach it their lips, talk (lip reading + phrase board, with confirm and undo), and a conversation log. **Ownership for today is by file, so the two Max computers never edit the same file:**
+
+| | **C (Claire): the app shell** | **A (Pokpong): engine, AI, Cartesia** | **B (Jenna): story, keys, QA** |
+|---|---|---|---|
+| Files | `web/src/App.tsx`, `src/pages/*` (except `Teach.tsx`), `src/components/*` (except `VoiceSetup.tsx`), new `src/lib/store.ts`, `router.ts`, `useBlinkSwitch.ts` | `web/src/engine/*`, new top-level `api/`, `src/lib/voice.ts`, `src/lib/speaker.ts`, `src/pages/Teach.tsx`, `src/components/VoiceSetup.tsx`, `web/vite.config.ts` | `README.md`, `pitch/`, this file, Vercel env vars |
+
+**Timeline:** ~11:15 C pushes `store.ts` + router (A is waiting on the `Patient` type) · ~11:00 A pushes the engine hooks (C needs them) · 2 PM each feature works alone · 3:30 PM C wires everything together, B tests on a real iPhone · **6 PM feature freeze**, then calibrate the demo actor, film, rehearse.
+
+**Rules:** `git pull --rebase` before every push, small commits, only your files, `npm run build && npm run test:engine` before pushing.
+
+**Shared contract** (`web/src/lib/store.ts`, C writes it exactly like this):
+```ts
+Patient { id; name; preferredName; room; relationship; notes; createdAt;
+  voice: { kind: 'demo'|'clone'|'device'; voiceId?: string; source?: 'upload'|'record'; bank?: number };
+  calibration: { at: number; takes: number; personal: Personal | null;
+                 check?: { before: number; after: number; n: number } } | null }
+LogEntry { id; patientId; at; phraseId; text; how: 'lips'|'board'|'scan';
+  confirmedBy: 'confident'|'blink'|'tap'; confidence?: number; undone?: boolean; correctedFrom?: string }
+```
+Plus actions `addPatient`, `updatePatient`, `removePatient`, `addEntry`, `updateEntry` and a `usePatient(id)` hook. `Personal` comes from `engine/mlp.ts`.
+
+**Other cross-owner interfaces (A provides, C uses):**
+- `useLipReader({ personal, onTake })` and the exported `BLINK_CLOSED`, `BLINK_HOLD_MS`, `SHORT_BLINK_MS`, `DOUBLE_BLINK_MS`, `isMock`.
+- `voiceUrl(patient, phraseId): Promise<string | null>` from `lib/voice.ts`, and `speak(id, text, src?)` (src undefined = today's `/audio/<id>.mp3`; null = device voice).
+- `<VoiceSetup patientId onDone />` and the `#/p/:id/teach` page.
+- Until A's piece lands, C stubs it (plain `useLipReader()`, `/audio/<id>.mp3`, a placeholder VoiceSetup).
+
+**Product rules for every flow:** nothing is said in the patient's voice without their yes (confident reading, a blink, or the family tapping after the patient nods), every spoken message can be undone, and every message is logged (undone ones stay in the log, struck through).
+
+### Prompt for C (Claire), paste after `/clear`
+
+> Read CLAUDE.md, section "Saturday build". I'm Computer C. Turn the single camera screen into a full app. Only edit the files C owns there.
+>
+> **Step 1 (push within 45 min; A is waiting):** `lib/router.ts`, a tiny hash router: `#/`, `#/new`, `#/p/:id`, `#/p/:id/talk`, `#/p/:id/teach`, `#/p/:id/voice`, `#/p/:id/log` (`?mock` and `?debug` stay in location.search and keep working). `lib/store.ts` with the exact shared contract, a localStorage store via useSyncExternalStore, storage wrapped in try/catch. `App.tsx` switches routes; Teach and Voice are placeholders for now.
+>
+> **Step 2, the pages.** Use design-system tokens. Pages are light; camera screens stay dark.
+> - **Home:** patient cards (initials avatar, name, room, voice status chip, "lips taught" chip, last message and time), "Add a patient", an empty state with 3 steps (Add them, Give them their voice, Talk), and "Try the demo patient", which creates one with `voice.kind = 'demo'`. Footer: "Everything stays on this phone. Not a medical device."
+> - **New patient:**
+>   1. Details: name, what they like to be called, hospital and room, your relationship (chips), notes for the care team.
+>   2. `<VoiceSetup patientId onDone />` (A builds it; stub it until then).
+>   3. "Teach it their lips now?" with Start (goes to teach) or Later (goes to the patient page).
+> - **Patient page:** big "Start talking". Rows: Phrase board · Teach it their lips (status and check result) · Their voice (status) · Conversation (last 3 entries). Small "Remove patient" with a confirm step.
+> - **Talk:** move PatientApp.tsx here.
+>   - Use `useLipReader({ personal: patient.calibration?.personal ?? null })` once A lands it.
+>   - Back button and a "Calibrated for {name}" pill.
+>   - Log every decided message. Picking another guess under "Not right?" for the same reading updates that entry with `correctedFrom` instead of adding a new one.
+>   - Add **Undo** to MessageSheet (buttons Replay · Not right? · Undo). It stops the audio, marks the entry `undone`, returns to ready and shows "Undone".
+> - **Phrase board** (`components/PhraseBoard.tsx`), opened by a Board button next to Listen. It covers the camera, but the camera keeps running underneath so blinks are still seen.
+>   - Sections: Urgent first, then "Their usual" (top 4 from the log), then each category from phrases.json.
+>   - Big 2-column buttons, plus a small lips icon on the phrases the model can read.
+>   - A face status chip: "Eyes visible" or "Can't see their face".
+>   - **Tap mode:** tapping a phrase opens a confirm panel: "Ask them: '{text}?' Hold eyes closed to say it, or tap Yes if they nod." It has a ConfirmRing driven by the blink hold, plus Yes and Not this.
+>   - **Blink scan mode (switch scanning, a standard AAC method):** highlight one section at a time (adjustable 1–3 s, default 1.5 s), pausing while the eyes are closed. A long blink enters the section, the scan steps through its phrases plus a "Back" item, and a long blink speaks the phrase. A double blink goes back. Scroll the highlighted item into view.
+>   - The board speaks through the same MessageSheet with Undo. Log it as `how: 'board'` (tap) or `'scan'` (blink).
+>   - `lib/useBlinkSwitch(faceRef, active, onHold, onDouble)`: a rAF loop on `faceRef.current.blink` using A's BLINK_* constants. In `?mock`, add "Hold = simulate blink" via `lr.simulateBlink`.
+> - **Log:** entries grouped by day. Each shows the phrase in Fraunces and a meta line ("2:14 PM · Lip reading · 82% sure", "Confirmed by blink", "Phrase board"). Undone entries are struck through; corrected ones say what they replaced. Replay per entry, filters All and Urgent, and Share (a navigator.share text summary for the nurse).
+>
+> Commit after each page. When A's pieces land, wire them in and speak through `speak(id, text, await voiceUrl(patient, id))`.
+
+### Prompt for A (Pokpong), paste after `/clear`
+
+> Read CLAUDE.md, section "Saturday build". I'm Computer A. Only edit the files A owns there. C pushes `lib/store.ts` (the Patient type) within about 45 min; do tasks 1 and 2 first and pull before task 3.
+>
+> **1. Engine hooks (push within 30 min, C needs them).**
+> - `useLipReader(options?: { personal?: Personal | null; onTake?: (x: Float64Array) => void })`. Keep both in refs and predict with `applyPersonal(model, personal)`.
+> - When `onTake` is set (calibration), `finish()` hands `features(seg)` to it instead of predicting (an empty array in `?mock`), then returns to 'ready'. A take with no motion sets the "Didn't catch that" notice.
+> - Export `BLINK_CLOSED`, `BLINK_HOLD_MS`, `SHORT_BLINK_MS`, `DOUBLE_BLINK_MS` and `isMock`.
+> - Keep the golden test passing.
+>
+> **2. Live cloning on the server.** The Vercel project root is the repo root, so functions go in `/api`.
+> - `api/clone.ts`: `export async function POST(req: Request)`. Takes multipart `clip` (WAV) and `name`, then calls `POST https://api.cartesia.ai/voices/clone` with headers `Authorization: Bearer $CARTESIA_API_KEY` and `Cartesia-Version: 2026-08-14`, and form fields `clip`, `name` and `language=en`. Return `{ id }`.
+> - `api/tts.ts`: takes `{ voiceId, text }` (text ≤ 200 chars) and calls `/tts/bytes` with the same body as `scripts/make-audio.mjs` (sonic-3.6, mp3 44100/128000). Return audio/mpeg.
+> - Reject requests whose Origin doesn't match the host. Use only Web APIs, with no npm deps and no reliance on @types/node.
+> - Add a Vite dev plugin in `vite.config.ts` that serves `/api/*` through `server.ssrLoadModule`, with the env from `web/.env.local`, so `npm run dev` can clone locally.
+>
+> **3. Voice on the phone.**
+> - `lib/voice.ts`:
+>   - `toWav(blob)`: decodeAudioData, mix to mono, resample to 22.05 kHz, keep the first 45 s. This stays under Vercel's 4.5 MB body limit and works with iPhone .mov and .m4a.
+>   - `cloneVoice(wav, name)`.
+>   - `buildBank(patientId, voiceId, onProgress)`: generates all 50 phrases through `/api/tts`, 3 at a time, core 8 first, into Cache Storage. It runs at module level so it survives navigation and updates `patient.voice.bank`.
+>   - `voiceUrl(patient, phraseId)`: demo patients get `/audio/<id>.mp3`. Clones get the cached blob URL, else live TTS, else null. Device-voice patients get null.
+> - `speaker.speak(id, text, src?)`: src undefined keeps today's behavior, and src null uses the device voice.
+> - `components/VoiceSetup.tsx` (`{ patientId, onDone }`). Four choices:
+>   - Upload a video or voice memo ("families usually have one").
+>   - Record them now, for patients who can still speak, e.g. before a planned surgery. Uses MediaRecorder, a timer, a passage to read aloud and an auto-stop at 60 s.
+>   - Use the demo voice.
+>   - Skip and use the phone's voice.
+>
+>   Then preview the extracted audio and require a consent checkbox ("I have permission from them or their legal representative"). Show "Creating their voice…", then auto-play a sample ("Hi, it's me. I can hear you."), then the phrase bank progress (n/50). On any error, offer "Use the demo voice instead".
+>
+> **4. `pages/Teach.tsx`, "Teach it their lips."**
+> - Camera full-bleed with CameraView, using `useLipReader({ onTake })`.
+> - Plan: `model.personal.takes` rounds × the model's classes, round by round. Each prompt reads "Ask them to mouth: '{phrase}'".
+> - Hands-free: show the next phrase for 1.4 s, then listen automatically. Advance only when a take arrives, otherwise retry the same phrase.
+> - A progress grid (phrases × rounds), plus Pause, Redo last and Finish now (after round 1).
+> - When done, run `personalize()` on all takes. Run an honest check: leave one round out, comparing first-guess accuracy of the shared vs. the calibrated model on the held-out takes.
+> - Save `patient.calibration` and show "Calibrated for {name}" with the check ("On takes it didn't learn from: 3/8 → 6/8"), then "Try it now", which goes to Talk.
+> - `?mock`: fake the takes and save `personal: null`.
+>
+> **5. If time remains:** record 5+ strangers at the venue (3 reps × core8) and retrain. Update the README results table only if the numbers improve.
+
+### B (Jenna), short tasks
+1. **Before 2 PM:** add the Cartesia key to Vercel (only the project owner can): `npx vercel env add CARTESIA_API_KEY production`, and paste the key at the prompt, never in chat.
+2. **Nurse calls:** get 1–2 quotes. Update the video shot list:
+   1. Add a patient.
+   2. Upload an old video and hear the clone after about 30 s.
+   3. Teach it their lips, sped up.
+   4. Talk: confident, then unsure, then blink-confirm.
+   5. Phrase board scan for a phrase the model can't read.
+   6. Undo.
+   7. The log.
+3. **~3:30 PM:** test the whole flow on the iPhone, including airplane mode with the demo patient. Send bugs to the file's owner.
+4. **After the freeze:** update the README (live cloning in the Cartesia table; remove "In progress") and write the Devpost.
+
+**Demo-day setup:**
+1. Create the demo actor as a patient.
+2. Use "demo voice", or clone live if the Wi-Fi is good.
+3. Run Teach it their lips about 10 minutes before judging.
 
 ## Plan and checkpoints
 
