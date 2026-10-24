@@ -2,6 +2,7 @@
 // The scaler is folded into the weights. Version 2 (MLP): h = relu(hidden.coef @ x + hidden.intercept),
 // logits = coef @ h + intercept. Version 1 (logistic regression, no `hidden`): logits = coef @ x + intercept.
 import { LIPS, REF } from './features'
+import { forward } from './mlp'
 import { PHRASE_BY_ID } from '../lib/phrases'
 import type { Guess } from './types'
 
@@ -18,14 +19,8 @@ export interface LipModel {
   hidden?: { intercept: number[]; coef: number[][] }
   intercept: number[]
   coef: number[][]
-}
-
-function affine(coef: number[][], intercept: number[], x: ArrayLike<number>): number[] {
-  return coef.map((w, i) => {
-    let z = intercept[i]
-    for (let j = 0; j < w.length; j++) z += w[j] * x[j]
-    return z
-  })
+  /** Personal calibration settings (see mlp.ts personalize). Temperature replaces the shared one. */
+  personal?: { takes: number; steps: number; lam_w: number; lam_b: number; temperature: number }
 }
 
 export async function loadModel(url = '/model/lipreader.json'): Promise<LipModel | null> {
@@ -40,8 +35,7 @@ export async function loadModel(url = '/model/lipreader.json'): Promise<LipModel
 }
 
 export function logits(model: LipModel, x: Float64Array): number[] {
-  const h = model.hidden ? affine(model.hidden.coef, model.hidden.intercept, x).map((v) => Math.max(v, 0)) : x
-  return affine(model.coef, model.intercept, h)
+  return forward(model, x)
 }
 
 /** All classes, most likely first, with temperature-calibrated probabilities. */

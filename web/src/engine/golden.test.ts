@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { features, normalize, TRACKED } from './features.ts'
+import { forward, personalize } from './mlp.ts'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const goldenPath = `${here}golden.json`
@@ -23,15 +24,19 @@ const x = features(seq)
 
 let worst = 0
 golden.features.forEach((v: number, i: number) => (worst = Math.max(worst, Math.abs(v - x[i]))))
-// Same forward pass as classifier.ts (which can't be imported here: it pulls in app modules).
-const affine = (coef: number[][], b: number[], v: ArrayLike<number>) =>
-  coef.map((w, i) => w.reduce((z, wj, j) => z + wj * v[j], b[i]))
-const h = model.hidden ? affine(model.hidden.coef, model.hidden.intercept, x).map((v) => Math.max(v, 0)) : x
-const logits = affine(model.coef, model.intercept, h)
-let worstLogit = 0
-golden.logits.forEach((v: number, i: number) => (worstLogit = Math.max(worstLogit, Math.abs(v - logits[i]))))
+const maxDiff = (a: number[], b: number[]) => a.reduce((m, v, i) => Math.max(m, Math.abs(v - b[i])), 0)
+const worstLogit = maxDiff(golden.logits, forward(model, x))
 
-const ok = x.length === golden.features.length && worst < 1e-9 && worstLogit < 1e-6
-console.log(`features: ${x.length} dims, max diff ${worst.toExponential(2)}; logits max diff ${worstLogit.toExponential(2)}`)
+// Personal calibration: same takes in, same adapted logits out.
+let worstPersonal = 0
+if (golden.personal) {
+  const ids = (golden.personal.labels as number[]).map((c) => model.classes[c])
+  const adapted = personalize(model, golden.personal.features, ids)
+  worstPersonal = maxDiff(golden.personal.logits, forward({ ...model, ...adapted }, x))
+}
+
+const ok = x.length === golden.features.length && worst < 1e-9 && worstLogit < 1e-6 && worstPersonal < 1e-6
+console.log(`features: ${x.length} dims, max diff ${worst.toExponential(2)}; logits max diff ${worstLogit.toExponential(2)}` +
+  (golden.personal ? `; personalized logits max diff ${worstPersonal.toExponential(2)}` : ''))
 console.log(ok ? 'PASS: TS port matches Python' : 'FAIL: TS port differs from Python')
 process.exit(ok ? 0 : 1)

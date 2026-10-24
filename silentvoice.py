@@ -12,6 +12,7 @@ Usage:
   python silentvoice.py record --person sam --set core8 --reps 3
   python silentvoice.py train                            # trains on everything in engine/data
   python silentvoice.py train --set core8                # Checkpoint 1 fallback
+  python silentvoice.py personal --set core8             # before/after chart for personal calibration
   (train also writes web/public/model/lipreader.json: the model the phone app runs)
   python silentvoice.py live                             # OpenCV debug window, events printed as JSON
 
@@ -65,6 +66,8 @@ I_INNER_TOP, I_INNER_BOTTOM = N_LIPS - 5, 25  # landmarks 13 and 14
 SEQ_LEN = 24          # frames per take after resampling
 MIN_FRAMES = 8        # shorter takes are discarded
 HIDDEN = 128          # MLP hidden units
+# "Teach it their lips": fine-tune the output layer on `takes` per phrase from the patient.
+PERSONAL = {"takes": 3, "steps": 300, "lam_w": 0.1, "lam_b": 0.1}
 
 
 # --------------------------------------------------------------------------- phrases
@@ -421,7 +424,7 @@ def _train(args):
     print(f"{len(seqs)} takes, {len(classes)} phrases, people: {sorted(set(people.tolist()))}")
     print("takes per phrase:", dict(zip(classes.tolist(), counts.tolist())))
 
-    temperature = 1.0
+    temperature = personal_temperature = 1.0
     result = evaluate(seqs, labels, people, args.aug)
     if result:
         mode, logits, classes = result
@@ -469,6 +472,8 @@ def _train(args):
         confusion = chart.replace("accuracy_", "confusion_")
         save_confusion(cm, classes, mode, confusion)
         print(f"confusion -> {confusion}")
+        if mode == "leave-one-person-out":
+            personal_temperature = report_personal(seqs, labels, people, args, temperature)
         if t3 >= 0.8:
             print("Checkpoint 1: >= 80% top-3. Keep going.")
         elif t3 >= 0.6:
@@ -480,12 +485,11 @@ def _train(args):
     os.makedirs(MODELS_DIR, exist_ok=True)
     joblib.dump({"clf": clf, "classes": clf.classes_.tolist(), "seq_len": SEQ_LEN}, LIP_MODEL)
     print(f"model -> {LIP_MODEL}")
-    export_web(clf, temperature, args.threshold)
+    export_web(clf, temperature, args.threshold, personal_temperature)
 
 
-def export_web(clf, temperature: float, threshold: float):
-    """Write the model for the phone app (web/public/model/lipreader.json) plus a golden
-    fixture that web/src/engine/golden.test.ts uses to prove the TS port matches Python."""
+def web_model(clf, temperature: float, threshold: float) -> dict:
+    """The JSON the phone app loads."""
     scaler = clf.named_steps["standardscaler"]
     mlp = clf.named_steps["mlpclassifier"]
     # Fold the scaler into the hidden layer: h = relu(W1 @ x + b1) on raw features,
@@ -494,12 +498,20 @@ def export_web(clf, temperature: float, threshold: float):
     W1 = (mlp.coefs_[0] / scaler.scale_[:, None]).T
     b1 = mlp.intercepts_[0] - W1 @ scaler.mean_
     sig = lambda a: [float(f"{v:.5g}") for v in a]  # noqa: E731
-    model = {
+    return {
         "version": 2, "seq_len": SEQ_LEN, "lips": LIPS, "ref": REF,
         "classes": clf.classes_.tolist(), "temperature": round(temperature, 4), "threshold": threshold,
         "hidden": {"intercept": sig(b1), "coef": [sig(row) for row in W1]},
         "intercept": sig(mlp.intercepts_[1]), "coef": [sig(row) for row in mlp.coefs_[1].T],
     }
+
+
+def export_web(clf, temperature: float, threshold: float, personal_temperature: float):
+    """Write the model for the phone app (web/public/model/lipreader.json) plus a golden
+    fixture that web/src/engine/golden.test.ts uses to prove the TS port matches Python."""
+    model = web_model(clf, temperature, threshold)
+    # After personalizing, the app swaps in this temperature (the adapted model is sharper).
+    model["personal"] = {**PERSONAL, "temperature": round(personal_temperature, 4)}
     os.makedirs(os.path.dirname(WEB_MODEL), exist_ok=True)
     with open(WEB_MODEL, "w") as f:
         json.dump(model, f, separators=(",", ":"))
@@ -515,17 +527,176 @@ def export_web(clf, temperature: float, threshold: float):
     pts = base[None] + 0.01 * np.sin(t * 3 + rng.uniform(0, 6, (1, len(TRACKED), 1))) * (np.arange(len(TRACKED)) < N_LIPS)[None, :, None]
     pts = np.round(pts, 6)
     x = features(normalize(pts, 1280, 720))
+    # Personalization fixture: one jittered copy of the take per class, run through personalize().
+    Xc = np.stack([features(augment(normalize(pts, 1280, 720), rng)) for _ in model["classes"]])
+    Xc = np.vectorize(lambda v: float(f"{v:.6g}"))(Xc)
+    yc = np.arange(len(model["classes"]))
+    W, b = personalize(model, Xc, yc)
     golden = {"w": 1280, "h": 720, "points": pts.tolist(), "features": x.tolist(),
-              "logits": web_logits(model, x).tolist()}
+              "logits": web_logits(model, x).tolist(),
+              "personal": {"features": Xc.tolist(), "labels": yc.tolist(),
+                           "logits": (web_hidden(model, x) @ W.T + b).tolist()}}
     os.makedirs(os.path.dirname(GOLDEN), exist_ok=True)
     with open(GOLDEN, "w") as f:
         json.dump(golden, f)
 
 
+def web_hidden(model: dict, X: np.ndarray) -> np.ndarray:
+    """Hidden-layer activations from the exported JSON, for one feature vector or a batch."""
+    return np.maximum(X @ np.asarray(model["hidden"]["coef"]).T + np.asarray(model["hidden"]["intercept"]), 0)
+
+
 def web_logits(model: dict, x: np.ndarray) -> np.ndarray:
     """Forward pass on the exported JSON, exactly as web/src/engine/classifier.ts does it."""
-    h = np.maximum(np.asarray(model["hidden"]["coef"]) @ x + np.asarray(model["hidden"]["intercept"]), 0)
-    return np.asarray(model["coef"]) @ h + np.asarray(model["intercept"])
+    return web_hidden(model, x) @ np.asarray(model["coef"]).T + np.asarray(model["intercept"])
+
+
+# --------------------------------------------------------------------------- personal calibration
+
+def personalize(model: dict, X: np.ndarray, y: np.ndarray):
+    """Teach it their lips: fine-tune the output layer on a few takes from one person.
+
+    X is (n, features), y the class index of each take. Gradient descent on cross-entropy,
+    with an L2 pull back toward the shared weights so 3 takes per phrase can't wreck it.
+    Returns the new (coef, intercept). web/src/engine/personalize.ts is a line-for-line port.
+    """
+    H = web_hidden(model, X)
+    W0, b0 = np.asarray(model["coef"]), np.asarray(model["intercept"])
+    W, b = W0.copy(), b0.copy()
+    Y = np.eye(len(b0))[y]
+    lr = 1.0 / (np.mean((H ** 2).sum(axis=1)) + 1.0)
+    for _ in range(PERSONAL["steps"]):
+        G = (softmax(H @ W.T + b) - Y) / len(y)
+        W = W - lr * (G.T @ H + PERSONAL["lam_w"] * (W - W0))
+        b = b - 0.5 * (G.sum(axis=0) + PERSONAL["lam_b"] * (b - b0))
+    return W, b
+
+
+def personal_eval(seqs, labels, people, n_aug: int, ks=(PERSONAL["takes"],), draws: int = 5):
+    """For each person: train without them, personalize on k of their takes per phrase, test on
+    the rest (5 random draws). Returns {k: (person, logits_before, logits_after, y)}."""
+    classes = np.unique(labels)
+    y_all = np.searchsorted(classes, labels)
+    X_all = np.stack([features(s) for s in seqs])
+    rows = {k: [] for k in ks}
+    for p in sorted(set(people)):
+        tr = people != p
+        clf = fit([seqs[i] for i in np.where(tr)[0]], labels[tr], n_aug)
+        if len(clf.classes_) != len(classes):
+            continue
+        model = web_model(clf, 1.0, 0.5)
+        idx = np.where(people == p)[0]
+        fewest = min((y_all[idx] == c).sum() for c in range(len(classes)))
+        rng = np.random.default_rng(0)
+        for k in ks:
+            if fewest <= k:
+                continue
+            for _ in range(draws):
+                cal = np.concatenate([rng.choice(idx[y_all[idx] == c], k, replace=False) for c in range(len(classes))])
+                te = np.setdiff1d(idx, cal)
+                W, b = personalize(model, X_all[cal], y_all[cal])
+                H = web_hidden(model, X_all[te])
+                rows[k].append(([p] * len(te), H @ np.asarray(model["coef"]).T + np.asarray(model["intercept"]),
+                                H @ W.T + b, y_all[te]))
+    return {k: tuple(np.concatenate(col) for col in zip(*r)) for k, r in rows.items() if r}
+
+
+def _topk(logits, y):
+    order = np.argsort(-logits, axis=1)
+    return order[:, 0] == y, (order[:, :3] == y[:, None]).any(axis=1)
+
+
+def report_personal(seqs, labels, people, args, temperature: float) -> float:
+    """Print before/after personal calibration; return the temperature for personalized models."""
+    k = PERSONAL["takes"]
+    res = personal_eval(seqs, labels, people, args.aug).get(k)
+    if res is None:
+        print(f"\npersonal calibration: needs more than {k} takes per phrase per person")
+        return temperature
+    who, before, after, y = res
+    print(f"\n[personalized: {k} takes per phrase, then tested on the rest]")
+    for name, L in (("before", before), ("after", after)):
+        t1, t3 = _topk(L, y)
+        print(f"  {name:6s} top-1 {t1.mean():.1%}   top-3 {t3.mean():.1%}")
+    print("  top-1 per person: " + ", ".join(
+        f"{p} {_topk(before[who == p], y[who == p])[0].mean():.0%} -> {_topk(after[who == p], y[who == p])[0].mean():.0%}"
+        for p in sorted(set(who))))
+    pt = fit_temperature(after, y)
+    conf = softmax(after, pt).max(axis=1)
+    sure, top1 = conf >= args.threshold, _topk(after, y)[0]
+    print(f"  confidence after (temperature {pt:.2f}): speaks right away for {sure.mean():.0%} of takes, "
+          f"right {top1[sure].mean() if sure.any() else 0:.0%} of those")
+    return pt
+
+
+def save_personal_chart(curve: dict, per_person: dict, path: str):
+    """Left: accuracy vs takes per phrase. Right: top-1 per person, before vs after."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    before_c, after_c, ink, muted = "#7FA7C9", "#2F6B4F", "#1E2A2F", "#6B7A80"
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(10, 4), gridspec_kw={"width_ratios": [1, 1.2]})
+    ks = sorted(curve)
+    for i, (name, style) in enumerate((("top-1", "--"), ("top-3", "-"))):
+        vals = [curve[k][i] * 100 for k in ks]
+        a1.plot(ks, vals, style, color=after_c, linewidth=2, marker="o", markersize=7)
+        a1.annotate(f"{name} {vals[-1]:.0f}%", (ks[-1], vals[-1]), xytext=(6, 0),
+                    textcoords="offset points", va="center", fontsize=9, color=ink)
+    a1.set_xticks(ks, ["none" if k == 0 else str(k) for k in ks])
+    a1.set_xlabel("calibration takes per phrase from the new person")
+    a1.set_ylabel("accuracy on their other takes (%)")
+    a1.set_ylim(0, 100)
+    a1.set_xlim(-0.3, ks[-1] + 1.2)
+    a1.set_title("More takes, better reading", fontsize=11, color=ink)
+
+    names = list(per_person)
+    xs = np.arange(len(names))
+    for off, (label, color, j) in zip((-0.2, 0.2), (("before", before_c, 0), ("after 3 takes", after_c, 1))):
+        vals = [per_person[n][j] * 100 for n in names]
+        bars = a2.bar(xs + off, vals, width=0.38, color=color, label=label)
+        for bar, v in zip(bars, vals):
+            a2.text(bar.get_x() + bar.get_width() / 2, v + 1.5, f"{v:.0f}", ha="center", fontsize=8, color=ink)
+    a2.set_xticks(xs, [f"stranger {i + 1}" for i in range(len(names))])
+    a2.set_ylabel("first guess right (%)")
+    a2.set_ylim(0, 100)
+    a2.legend(frameon=False, fontsize=9, loc="upper left")
+    a2.set_title("Every held-out person improves", fontsize=11, color=ink)
+    for ax in (a1, a2):
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.spines[["left", "bottom"]].set_color(muted)
+        ax.tick_params(colors=muted)
+        ax.grid(axis="y", color="#E9E1D3", linewidth=0.8)
+        ax.set_axisbelow(True)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+
+
+def cmd_personal(args):
+    with np.errstate(all="ignore"):
+        ids = None if args.set == "all" else {p["id"] for p in phrase_set(args.set)}
+        seqs, labels, people = load_dataset(ids)
+        if len(set(people)) < 2:
+            sys.exit("Needs takes from 2+ people (train on some, personalize to another).")
+        print(f"{len(seqs)} takes, {len(set(labels))} phrases, {len(set(people))} people. "
+              "For each person: train without them, personalize, test on their other takes.")
+        res = personal_eval(seqs, labels, people, args.aug, ks=(1, 2, 3, 5))
+        if not res:
+            sys.exit("Not enough takes per phrase per person.")
+        first = res[min(res)]
+        curve = {0: tuple(m.mean() for m in _topk(first[1], first[3]))}
+        for k, (who, _, after, y) in sorted(res.items()):
+            curve[k] = tuple(m.mean() for m in _topk(after, y))
+        for k, (t1, t3) in curve.items():
+            print(f"  {k} takes per phrase: top-1 {t1:.1%}   top-3 {t3:.1%}")
+        k = PERSONAL["takes"] if PERSONAL["takes"] in res else min(res)
+        who, before, after, y = res[k]
+        per_person = {p: (_topk(before[who == p], y[who == p])[0].mean(), _topk(after[who == p], y[who == p])[0].mean())
+                      for p in sorted(set(who))}
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        path = os.path.join(REPORTS_DIR, f"personal_{int(time.time())}.png")
+        save_personal_chart(curve, per_person, path)
+        print(f"chart -> {path}")
 
 
 # --------------------------------------------------------------------------- live
@@ -832,6 +1003,11 @@ def main():
     t.add_argument("--threshold", type=float, default=0.7,
                    help="app speaks right away at or above this confidence, else asks to confirm")
     t.set_defaults(fn=cmd_train)
+
+    pc = sub.add_parser("personal", help="evaluate personal calibration, save the before/after chart")
+    pc.add_argument("--set", default="all", help="core8 | core12 | ids (default: all recorded)")
+    pc.add_argument("--aug", type=int, default=4)
+    pc.set_defaults(fn=cmd_personal)
 
     lv = sub.add_parser("live", help="run live with the OpenCV debug window")
     lv.add_argument("--cam", type=int, default=0)
