@@ -3,7 +3,7 @@
 //   #/              home
 //   #/new           add a patient
 //   #/p/:id         patient page
-//   #/p/:id/talk    lip reading + phrase board
+//   #/p/:id/talk    lip reading + phrase board (#/p/:id/talk?board opens the board)
 //   #/p/:id/teach   teach it their lips (A)
 //   #/p/:id/voice   their voice (A's VoiceSetup)
 //   #/p/:id/log     conversation log
@@ -12,16 +12,19 @@ import { useSyncExternalStore } from 'react'
 export type Route =
   | { name: 'home' }
   | { name: 'new' }
-  | { name: 'patient' | 'talk' | 'teach' | 'voice' | 'log'; id: string }
+  | { name: 'patient' | 'teach' | 'voice' | 'log'; id: string }
+  | { name: 'talk'; id: string; board: boolean }
 
-const SUBPAGES = ['talk', 'teach', 'voice', 'log'] as const
+const SUBPAGES = ['teach', 'voice', 'log'] as const
 
 export function parse(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean)
+  const [path, query = ''] = hash.replace(/^#\/?/, '').split('?')
+  const parts = path.split('/').filter(Boolean)
   if (parts[0] === 'new' && parts.length === 1) return { name: 'new' }
   if (parts[0] === 'p' && parts[1]) {
     const id = decodeURIComponent(parts[1])
     if (parts.length === 2) return { name: 'patient', id }
+    if (parts[2] === 'talk' && parts.length === 3) return { name: 'talk', id, board: new URLSearchParams(query).has('board') }
     const sub = SUBPAGES.find((s) => s === parts[2])
     if (sub && parts.length === 3) return { name: sub, id }
   }
