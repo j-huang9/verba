@@ -12,6 +12,7 @@ Usage:
   python silentvoice.py record --person sam --set core8 --reps 3
   python silentvoice.py train                            # trains on everything in engine/data
   python silentvoice.py train --set core8                # Checkpoint 1 fallback
+  (train also writes web/public/model/lipreader.json: the model the phone app runs)
   python silentvoice.py live                             # OpenCV debug window, events printed as JSON
 
 How it works:
@@ -45,6 +46,8 @@ MODELS_DIR = os.path.join(ENGINE_DIR, "models")
 REPORTS_DIR = os.path.join(ENGINE_DIR, "reports")
 FACE_MODEL = os.path.join(MODELS_DIR, "face_landmarker.task")
 LIP_MODEL = os.path.join(MODELS_DIR, "lipreader.joblib")
+WEB_MODEL = os.path.join(ROOT, "web", "public", "model", "lipreader.json")
+GOLDEN = os.path.join(ROOT, "web", "src", "engine", "golden.json")
 PHRASES_FILE = os.path.join(ROOT, "phrases.json")
 
 # MediaPipe face-mesh indices. Outer lip loop (20) then inner lip loop (20), both clockwise
@@ -161,7 +164,7 @@ def normalize(points: np.ndarray, w: int, h: int) -> np.ndarray:
     Removes head position, roll and distance from the camera, but keeps mouth width
     (smiles and puckers carry information).
     """
-    p = points[..., :2].astype(np.float32).copy()
+    p = points[..., :2].astype(np.float64).copy()
     p[..., 0] *= w / h  # undo the non-square normalization of x
     eye_vec = p[:, I_EYE_R] - p[:, I_EYE_L]
     scale = np.linalg.norm(eye_vec, axis=-1)
@@ -310,20 +313,12 @@ def fit(seqs, labels, n_aug: int, seed: int = 0):
     return clf
 
 
-def topk_hits(clf, seqs, labels, k: int = 3) -> tuple[np.ndarray, np.ndarray]:
-    proba = clf.predict_proba(np.stack([features(s) for s in seqs]))
-    order = np.argsort(-proba, axis=1)
-    classes = clf.classes_
-    top1 = classes[order[:, 0]] == labels
-    topk = np.array([lab in classes[o[:k]] for lab, o in zip(labels, order)])
-    return top1, topk
-
-
 def evaluate(seqs, labels, people, n_aug: int):
-    """Leave-one-person-out if there are 2+ people (honest 'stranger' accuracy), else 5-fold."""
+    """Held-out logits for every take. Leave-one-person-out if there are 2+ people (honest
+    'stranger' accuracy), else k-fold. Returns (mode, logits[n, C], classes) or None."""
     from sklearn.model_selection import StratifiedKFold
 
-    folds = []
+    classes = np.unique(labels)
     if len(set(people)) >= 2:
         folds = [(np.where(people != p)[0], np.where(people == p)[0]) for p in sorted(set(people))]
         mode = "leave-one-person-out"
@@ -334,14 +329,26 @@ def evaluate(seqs, labels, people, n_aug: int):
         skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
         folds = list(skf.split(np.zeros(len(labels)), labels))
         mode = f"{n_splits}-fold"
-    top1, top3, test_labels = [], [], []
+    logits = np.full((len(seqs), len(classes)), -1e9)
     for tr, te in folds:
         clf = fit([seqs[i] for i in tr], labels[tr], n_aug)
-        a, b = topk_hits(clf, [seqs[i] for i in te], labels[te])
-        top1.append(a)
-        top3.append(b)
-        test_labels.append(labels[te])
-    return mode, np.concatenate(top1), np.concatenate(top3), np.concatenate(test_labels)
+        cols = np.searchsorted(classes, clf.classes_)  # a fold may miss a class
+        logits[np.ix_(te, cols)] = clf.decision_function(np.stack([features(seqs[i]) for i in te]))
+    return mode, logits, classes
+
+
+def softmax(z: np.ndarray, temperature: float = 1.0) -> np.ndarray:
+    z = z / temperature
+    z = z - z.max(axis=-1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=-1, keepdims=True)
+
+
+def fit_temperature(logits: np.ndarray, y: np.ndarray) -> float:
+    """Temperature scaling: pick T so the app's 'X% sure' matches how often it is right."""
+    grid = np.exp(np.linspace(np.log(0.1), np.log(10), 121))
+    nll = [-np.log(softmax(logits, t)[np.arange(len(y)), y] + 1e-12).mean() for t in grid]
+    return float(grid[int(np.argmin(nll))])
 
 
 def save_chart(per_phrase: dict, mode: str, path: str):
@@ -378,12 +385,30 @@ def _train(args):
     print(f"{len(seqs)} takes, {len(classes)} phrases, people: {sorted(set(people.tolist()))}")
     print("takes per phrase:", dict(zip(classes.tolist(), counts.tolist())))
 
+    temperature = 1.0
     result = evaluate(seqs, labels, people, args.aug)
     if result:
-        mode, top1, top3, test_labels = result
+        mode, logits, classes = result
+        y = np.searchsorted(classes, labels)
+        order = np.argsort(-logits, axis=1)
+        top1 = order[:, 0] == y
+        top3 = (order[:, :3] == y[:, None]).any(axis=1)
         t1, t3 = top1.mean(), top3.mean()
         print(f"\n[{mode}]  top-1 {t1:.1%}   top-3 {t3:.1%}")
-        per_phrase = {c: float(top3[test_labels == c].mean()) for c in classes}
+
+        # Confidence report: what the app's confidence bar and "not sure" threshold will do.
+        temperature = fit_temperature(logits, y)
+        conf = softmax(logits, temperature).max(axis=1)
+        sure = conf >= args.threshold
+        print(f"\nconfidence (temperature {temperature:.2f}), threshold {args.threshold:.0%}:")
+        print(f"  speaks right away for {sure.mean():.0%} of takes, and is right {top1[sure].mean() if sure.any() else 0:.0%} of those")
+        print(f"  asks to confirm for {(~sure).mean():.0%}; the answer is in its top 3 for {top3[~sure].mean() if (~sure).any() else 0:.0%} of those")
+        for lo in (0.0, 0.4, 0.6, 0.8):
+            band = (conf >= lo) & (conf < lo + 0.2 if lo < 0.8 else conf <= 1)
+            if band.any():
+                print(f"  says {lo:.0%}-{min(lo + 0.2, 1):.0%} sure: right {top1[band].mean():.0%} of the time ({band.sum()} takes)")
+
+        per_phrase = {c: float(top3[labels == c].mean()) for c in classes}
         for c, acc in sorted(per_phrase.items(), key=lambda kv: kv[1]):
             print(f"  {c:16s} top-3 {acc:.0%}")
         os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -401,6 +426,43 @@ def _train(args):
     os.makedirs(MODELS_DIR, exist_ok=True)
     joblib.dump({"clf": clf, "classes": clf.classes_.tolist(), "seq_len": SEQ_LEN}, LIP_MODEL)
     print(f"model -> {LIP_MODEL}")
+    export_web(clf, temperature, args.threshold)
+
+
+def export_web(clf, temperature: float, threshold: float):
+    """Write the model for the phone app (web/public/model/lipreader.json) plus a golden
+    fixture that web/src/engine/golden.test.ts uses to prove the TS port matches Python."""
+    scaler = clf.named_steps["standardscaler"]
+    lr = clf.named_steps["logisticregression"]
+    # Fold the scaler into the weights: logits = W @ x + b on raw features.
+    W = lr.coef_ / scaler.scale_
+    b = lr.intercept_ - W @ scaler.mean_
+    sig = lambda a: [float(f"{v:.7g}") for v in a]  # noqa: E731
+    model = {
+        "version": 1, "seq_len": SEQ_LEN, "lips": LIPS, "ref": REF,
+        "classes": clf.classes_.tolist(), "temperature": round(temperature, 4), "threshold": threshold,
+        "intercept": sig(b), "coef": [sig(row) for row in W],
+    }
+    os.makedirs(os.path.dirname(WEB_MODEL), exist_ok=True)
+    with open(WEB_MODEL, "w") as f:
+        json.dump(model, f, separators=(",", ":"))
+    print(f"phone model -> {WEB_MODEL} ({os.path.getsize(WEB_MODEL) // 1024} KB). Commit + push it.")
+
+    # Golden fixture: a synthetic take (no real faces) and what Python computes for it.
+    t = np.linspace(0, 2 * np.pi, 31)[:, None, None]
+    rng = np.random.default_rng(7)
+    base = np.zeros((len(TRACKED), 2))
+    ang = np.linspace(0, 2 * np.pi, N_LIPS, endpoint=False)
+    base[:N_LIPS] = np.stack([0.5 + 0.05 * np.cos(ang), 0.62 + 0.02 * np.sin(ang)], -1)
+    base[I_EYE_L], base[I_EYE_R], base[I_NOSE], base[-1] = [0.43, 0.42], [0.57, 0.41], [0.5, 0.52], [0.5, 0.75]
+    pts = base[None] + 0.01 * np.sin(t * 3 + rng.uniform(0, 6, (1, len(TRACKED), 1))) * (np.arange(len(TRACKED)) < N_LIPS)[None, :, None]
+    pts = np.round(pts, 6)
+    x = features(normalize(pts, 1280, 720))
+    golden = {"w": 1280, "h": 720, "points": pts.tolist(), "features": x.tolist(),
+              "logits": (np.asarray(model["coef"]) @ x + np.asarray(model["intercept"])).tolist()}
+    os.makedirs(os.path.dirname(GOLDEN), exist_ok=True)
+    with open(GOLDEN, "w") as f:
+        json.dump(golden, f)
 
 
 # --------------------------------------------------------------------------- live
@@ -704,6 +766,8 @@ def main():
     t = sub.add_parser("train", help="evaluate + train the phrase classifier")
     t.add_argument("--set", default="all", help="restrict to core8 | core12 | ids (default: all recorded)")
     t.add_argument("--aug", type=int, default=4, help="augmented copies per take")
+    t.add_argument("--threshold", type=float, default=0.6,
+                   help="app speaks right away at or above this confidence, else asks to confirm")
     t.set_defaults(fn=cmd_train)
 
     lv = sub.add_parser("live", help="run live with the OpenCV debug window")

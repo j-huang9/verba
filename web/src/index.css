@@ -16,6 +16,8 @@
   --color-sky: #7fa7c9;
   --color-coral: #e46f5c; /* urgent: nurse view only, never on the bedside screen */
   --color-coral-soft: #fbe3de;
+  --color-honey: #a86b12; /* "not entirely sure": calm amber, never red */
+  --color-honey-soft: #f8edd8;
 
   --text-phrase: 6rem; /* confirmed phrase, bedside */
   --text-phrase--line-height: 1.05;
@@ -24,6 +26,16 @@
 
   --radius-card: 1.75rem;
   --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-sheet-in: sheet-in 450ms var(--ease-calm) both;
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
 
   /* motion moment #3: confirmed phrase fades in while the voice plays */
   --animate-phrase-in: phrase-in 900ms var(--ease-calm) both;
@@ -53,6 +65,8 @@
     --color-sky: #9cc0de;
     --color-coral: #f08a78;
     --color-coral-soft: #3a2420;
+    --color-honey: #e0b15a;
+    --color-honey-soft: #3a2f1c;
   }
 }
 :root[data-theme='dark'] {
@@ -66,6 +80,8 @@
   --color-sky: #9cc0de;
   --color-coral: #f08a78;
   --color-coral-soft: #3a2420;
+  --color-honey: #e0b15a;
+  --color-honey-soft: #3a2f1c;
 }
 
 html,

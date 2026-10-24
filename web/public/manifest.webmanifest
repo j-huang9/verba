@@ -1,0 +1,11 @@
+{
+  "name": "Silent Voice",
+  "short_name": "Silent Voice",
+  "description": "Lip-reading voice for patients who can't speak.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1214",
+  "theme_color": "#0d1214",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
