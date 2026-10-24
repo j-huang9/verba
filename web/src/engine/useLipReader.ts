@@ -38,11 +38,43 @@ interface Machine {
   blinkProgress: number
   lastPublish: number
   face: boolean
+  // ?debug overlay only
+  fps: number
+  lastFrame: number
+  blink: number
+  segFrames: number
+  segMs: number
+  stopReason: StopReason | null
+}
+
+type StopReason = 'quiet' | 'max' | 'tap'
+
+/** Live tuning numbers for the ?debug overlay. Read with readDebug(); does not re-render. */
+export interface DebugStats {
+  phase: Phase
+  fps: number
+  /** smoothed per-frame lip motion vs. the level that counts as mouthing */
+  energy: number
+  motionOn: number
+  baseline: number
+  blink: number
+  blinkClosed: number
+  /** frames / ms captured so far while listening, else the last capture */
+  segFrames: number
+  segMs: number
+  /** ms since the mouth last moved (listening only), vs. QUIET_MS */
+  quietMs: number | null
+  quietLimit: number
+  stopReason: StopReason | null
 }
 
 const isMock = () => new URLSearchParams(window.location.search).has('mock')
 
-export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (closed: boolean) => void } {
+export function useLipReader(): LipReader & {
+  mock: boolean
+  simulateBlink: (closed: boolean) => void
+  readDebug: () => DebugStats
+} {
   const [mock] = useState(isMock)
   const [facing, setFacing] = useState<'user' | 'environment'>('environment')
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +101,7 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
     phase: 'loading', guesses: [], selected: 0, message: null, notice: null, segment: [], prev: null,
     energy: 0, baseline: 0.002, motionSeen: false, listenStart: 0, lastMotion: 0, closedSince: null,
     latched: false, lastShortBlink: 0, blinkProgress: 0, lastPublish: 0, face: false,
+    fps: 0, lastFrame: 0, blink: 0, segFrames: 0, segMs: 0, stopReason: null,
   })
 
   const publish = useCallback(() => {
@@ -88,10 +121,13 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
     publish()
   }, [publish])
 
-  const finish = useCallback(() => {
+  const finish = useCallback((reason: StopReason) => {
     const s = m.current
     const seg = s.segment
     s.segment = []
+    s.segFrames = seg.length
+    s.segMs = performance.now() - s.listenStart
+    s.stopReason = reason
     let ranked: Guess[] | null = null
     if (mock) ranked = mockResult()
     else if (!modelRef.current) s.notice = 'No lip model yet. Train on the Pro Max, or open with ?mock'
@@ -150,6 +186,8 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
 
   const onFrame = useCallback((frame: TrackerFrame | null, now: number) => {
     const s = m.current
+    if (s.lastFrame) s.fps = 0.9 * s.fps + 0.1 * (1000 / Math.max(now - s.lastFrame, 1))
+    s.lastFrame = now
     const hasFace = frame !== null
     if (hasFace !== s.face) {
       s.face = hasFace
@@ -161,6 +199,7 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
     }
     const blink = mock ? (mockBlink.current ? 1 : 0) : frame.blink
     faceRef.current = { lips: frame.points.subarray(0, N_LIPS * 2), blink }
+    s.blink = blink
 
     const norm = normalize(frame.points, frame.w, frame.h)
     if (s.prev) s.energy = 0.5 * s.energy + 0.5 * motion(norm, s.prev)
@@ -177,10 +216,9 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
       }
       const elapsed = now - s.listenStart
       if (mock) {
-        if (elapsed > 1600) finish()
-      } else if ((s.motionSeen && now - s.lastMotion > QUIET_MS && elapsed > MIN_LISTEN_MS) || elapsed > MAX_LISTEN_MS) {
-        finish()
-      }
+        if (elapsed > 1600) finish('quiet')
+      } else if (s.motionSeen && now - s.lastMotion > QUIET_MS && elapsed > MIN_LISTEN_MS) finish('quiet')
+      else if (elapsed > MAX_LISTEN_MS) finish('max')
     } else if (s.phase === 'confirming') {
       onBlink(closed, now)
     }
@@ -268,7 +306,7 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
   }, [publish])
 
   const stopListening = useCallback(() => {
-    if (m.current.phase === 'listening') finish()
+    if (m.current.phase === 'listening') finish('tap')
   }, [finish])
 
   const choose = useCallback((i: number) => {
@@ -287,6 +325,26 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
   const flipCamera = useCallback(() => setFacing((f) => (f === 'user' ? 'environment' : 'user')), [])
   const simulateBlink = useCallback((closed: boolean) => {
     mockBlink.current = closed
+  }, [])
+
+  const readDebug = useCallback((): DebugStats => {
+    const s = m.current
+    const now = performance.now()
+    const listening = s.phase === 'listening'
+    return {
+      phase: s.phase,
+      fps: now - s.lastFrame > 1000 ? 0 : s.fps,
+      energy: s.energy,
+      motionOn: Math.max(MOTION_ON_FLOOR, s.baseline * 2.5),
+      baseline: s.baseline,
+      blink: s.blink,
+      blinkClosed: BLINK_CLOSED,
+      segFrames: listening ? s.segment.length : s.segFrames,
+      segMs: listening ? now - s.listenStart : s.segMs,
+      quietMs: listening && s.motionSeen ? now - s.lastMotion : null,
+      quietLimit: QUIET_MS,
+      stopReason: listening ? null : s.stopReason,
+    }
   }, [])
 
   // Phones only expose the camera on HTTPS (or localhost).
@@ -310,5 +368,6 @@ export function useLipReader(): LipReader & { mock: boolean; simulateBlink: (clo
     flipCamera,
     mock,
     simulateBlink,
+    readDebug,
   }
 }

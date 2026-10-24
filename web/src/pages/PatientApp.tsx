@@ -1,7 +1,8 @@
 // The whole app: a family member points the phone at the patient, taps Listen, the patient
 // mouths a phrase, and the phone shows how sure it is, then speaks it in the patient's voice.
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { CameraView } from '../components/CameraView'
+import { DebugOverlay } from '../components/DebugOverlay'
 import { ConfirmSheet, MessageSheet } from '../components/ResultSheets'
 import { useLipReader } from '../engine/useLipReader'
 import { unlockAudio, useSpeaker } from '../lib/speaker'
@@ -10,11 +11,14 @@ import { usePrefersReducedMotion } from '../lib/usePrefersReducedMotion'
 // Let the confidence bar fill before the voice starts.
 const SPEAK_DELAY_MS = 800
 
+const isDebug = () => new URLSearchParams(window.location.search).has('debug')
+
 export default function PatientApp() {
   const lr = useLipReader()
   const speaker = useSpeaker()
   const { speak } = speaker
   const reduced = usePrefersReducedMotion()
+  const [debug] = useState(isDebug)
 
   // Speak each new message once (lr.message only changes identity when a new one is decided).
   useEffect(() => {
@@ -26,8 +30,8 @@ export default function PatientApp() {
   }, [lr.message, speak])
 
   const listen = () => {
+    speaker.stop() // before unlocking: stop() pauses the element and cancels speech
     unlockAudio() // inside the tap, so iOS allows the voice to play later
-    speaker.stop()
     lr.listen()
   }
 
@@ -52,6 +56,8 @@ export default function PatientApp() {
         listening={lr.phase === 'listening'}
         mock={lr.mock}
       />
+
+      {debug && <DebugOverlay read={lr.readDebug} voice={speaker.speaking ? `${speaker.status} ▶` : speaker.status} />}
 
       <header className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/50 to-transparent px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-10">
         <div>

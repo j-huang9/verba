@@ -86,7 +86,7 @@ npm run dev          # http://localhost:5173 (laptop webcam works on localhost).
 npm run dev:phone    # https://<LAN-IP>:5173 for a phone on the same Wi-Fi
 npm run audio        # pre-generate cloned voice (needs CARTESIA_API_KEY + CARTESIA_VOICE_ID in web/.env.local)
 ```
-Deploy: `cd web && npx vercel`, with the root directory set to `web/`. Then open the URL on the phone and add it to the home screen.
+Deploy: `npx vercel deploy --prod` from the **repo root** (`vercel.json` builds `web/` and needs the root `phrases.json`). Live at https://silent-voice-puce.vercel.app. Then open the URL on the phone and add it to the home screen. Add `?debug` for the tuning overlay.
 
 ## The lip reader
 
