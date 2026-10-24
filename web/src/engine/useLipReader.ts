@@ -87,6 +87,8 @@ export function useLipReader(options: LipReaderOptions = {}): LipReader & {
   mock: boolean
   simulateBlink: (closed: boolean) => void
   readDebug: () => DebugStats
+  /** the shared lip model once loaded (null in ?mock); Teach uses it to personalize */
+  model: LipModel | null
 } {
   const [mock] = useState(isMock)
   const [facing, setFacing] = useState<'user' | 'environment'>('environment')
@@ -400,5 +402,6 @@ export function useLipReader(options: LipReaderOptions = {}): LipReader & {
     mock,
     simulateBlink,
     readDebug,
+    model,
   }
 }
