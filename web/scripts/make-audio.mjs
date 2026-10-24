@@ -7,7 +7,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const { CARTESIA_API_KEY: key, CARTESIA_VOICE_ID: voice } = process.env
 if (!key || !voice) throw new Error('Set CARTESIA_API_KEY and CARTESIA_VOICE_ID in web/.env.local')
-const model = process.env.CARTESIA_MODEL ?? 'sonic-3.5'
+// sonic-3.6 uses up to 60 s of the clone clip (older models only the first 10 s)
+const model = process.env.CARTESIA_MODEL ?? 'sonic-3.6'
 const force = process.argv.includes('--force')
 
 const { phrases } = JSON.parse(readFileSync(new URL('../../phrases.json', import.meta.url), 'utf8'))
@@ -17,12 +18,12 @@ mkdirSync(out, { recursive: true })
 for (const p of phrases) {
   const file = new URL(`${p.id}.mp3`, out)
   if (existsSync(file) && !force) continue
-  // API reference: https://docs.cartesia.ai/2026-03-01/api-reference/tts/bytes
+  // API reference: https://docs.cartesia.ai/api-reference/tts/bytes
   const res = await fetch('https://api.cartesia.ai/tts/bytes', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
-      'Cartesia-Version': '2026-03-01',
+      'Cartesia-Version': '2026-08-14',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

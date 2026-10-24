@@ -115,9 +115,21 @@ The app is used by a scared family member at a bedside, often one-handed, in a d
 - **Layout:** a full-bleed camera, a header with the wordmark, a status pill and a flip-camera button, a big round Listen button at the bottom, and bottom sheets (`rounded-t-[2rem]`) for results. Respect the safe areas.
 - **Motion:** use `ease-calm` and spend it on a few moments only: (1) the live lip outline over the mouth, which glows while listening; (2) the confidence bar filling; (3) the confirm ring filling with a held blink; and (4) the phrase fading in with the waveform while the voice plays. Respect `prefers-reduced-motion`.
 
-## Cartesia
+## Cartesia (owner: B)
 
-Clone the voice in the Cartesia playground from about 10 s of clean audio. For the demo, use a teammate's Instagram video; in the pitch, it comes from an old family video. Copy the voice id, put `CARTESIA_API_KEY` and `CARTESIA_VOICE_ID` in `web/.env.local`, and run `npm run audio`. That writes `web/public/audio/<phrase_id>.mp3` for every phrase using `POST https://api.cartesia.ai/tts/bytes` (`Cartesia-Version: 2026-03-01`, model `sonic-3.5`). Commit the mp3s. If a file is missing, the app falls back to the device voice and shows a small note.
+Every phrase is **pre-generated** in the cloned voice and committed as `web/public/audio/<phrase_id>.mp3`. The app never calls Cartesia at runtime and never sees the API key.
+
+1. **Pick the voice.** Clone the teammate who plays the patient in the demo, so the room hears the person who's mouthing.
+2. **Get a clip:** 10 to 60 s of that person talking alone, with no music and no echo. An old Instagram or TikTok video matches the pitch story ("from an old family video"); a voice memo is the backup. Convert a video to audio with `afconvert -f WAVE -d LEI16 video.mp4 clip.wav`, which is built into macOS. The clone accepts wav, mp3, flac, ogg and webm up to 16 MB.
+3. **Clone** at https://play.cartesia.ai/voices/create/clone: upload or record the clip, set the language to English, and name it. Copy the **voice id** and test it on "Where's my mom?" in the playground. If it doesn't sound like them, try a cleaner or longer clip.
+4. **API key:** create one in the playground (`sk_car_…`). Ask the Cartesia booth about credits; all 50 phrases come to only about 1,000 characters.
+5. In `web/.env.local`, set `CARTESIA_API_KEY=…` and `CARTESIA_VOICE_ID=…`, then run `cd web && npm run audio`. It uses `POST https://api.cartesia.ai/tts/bytes` with `Cartesia-Version: 2026-08-14` and model `sonic-3.6`, which uses up to 60 s of the clip. It skips files that already exist; `--force` redoes them all, and deleting one mp3 then rerunning regenerates just that phrase.
+6. Listen to the clips, especially core12. Commit and push `web/public/audio/`. If a file is missing, the app falls back to the device voice and shows a small note.
+7. If `phrases.json` changes (a new or swapped phrase), rerun `npm run audio`; only the new ones are generated.
+
+API alternative to step 3: `curl -X POST https://api.cartesia.ai/voices/clone -H "Authorization: Bearer $KEY" -H "Cartesia-Version: 2026-08-14" -F clip=@clip.wav -F name="Patient" -F language=en`. The new voice is the `id` in the response.
+
+Stretch (C, Saturday, only if the core is solid): **live cloning in the app.** The family uploads a video, a Vercel function calls `/voices/clone` and then `/tts/bytes` with the key kept server-side, and the app caches the mp3s. It's great for the Cartesia track, but it needs network, so keep the pre-generated voice as the demo default.
 
 ## Plan and checkpoints
 
