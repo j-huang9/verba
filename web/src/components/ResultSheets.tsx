@@ -22,6 +22,7 @@ export function ConfirmSheet({
   threshold,
   onChoose,
   onRetry,
+  onBoard,
   mock,
   onSimulateBlink,
 }: {
@@ -31,6 +32,8 @@ export function ConfirmSheet({
   threshold: number
   onChoose: (i: number) => void
   onRetry: () => void
+  /** "None of these → phrase board" */
+  onBoard: () => void
   mock: boolean
   onSimulateBlink: (closed: boolean) => void
 }) {
@@ -67,6 +70,9 @@ export function ConfirmSheet({
             </button>
           ),
         )}
+        <button type="button" onClick={onBoard} className="rounded-full border border-line px-4 py-2 text-ink active:bg-canvas">
+          None of these → phrase board
+        </button>
       </div>
 
       <div className="mt-5 flex gap-3">
@@ -98,6 +104,8 @@ export function MessageSheet({
   reduced,
   onReplay,
   onChoose,
+  onBoard,
+  onUndo,
   onNext,
 }: {
   message: Message
@@ -108,6 +116,10 @@ export function MessageSheet({
   reduced: boolean
   onReplay: () => void
   onChoose: (phraseId: string) => void
+  /** "None of these → phrase board" under "Not right?" */
+  onBoard: () => void
+  /** stop the voice, mark the log entry undone, back to ready */
+  onUndo: () => void
   onNext: () => void
 }) {
   const [showOthers, setShowOthers] = useState(false)
@@ -130,7 +142,7 @@ export function MessageSheet({
         {fallbackVoice && <p className="mt-1 text-xs text-muted">Cloned voice not generated yet. Using the device voice.</p>}
       </div>
 
-      {showOthers && others.length > 0 && (
+      {showOthers && (
         <div className="mt-4 flex flex-wrap gap-2">
           {others.map((g) => (
             <button
@@ -145,22 +157,28 @@ export function MessageSheet({
               {g.text}
             </button>
           ))}
+          <button type="button" onClick={onBoard} className="rounded-full border border-line px-4 py-2 text-ink active:bg-canvas">
+            {others.length ? 'None of these → phrase board' : 'Open the phrase board'}
+          </button>
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="mt-6 grid grid-cols-3 gap-3">
         <button type="button" onClick={onReplay} className="rounded-full bg-canvas py-3 font-medium text-ink">
-          Play again
+          Replay
         </button>
         <button
           type="button"
           onClick={() => setShowOthers((v) => !v)}
-          disabled={others.length === 0}
-          className="rounded-full bg-canvas py-3 font-medium text-ink disabled:opacity-40"
+          aria-expanded={showOthers}
+          className="rounded-full bg-canvas py-3 font-medium text-ink"
         >
           Not right?
         </button>
-        <button type="button" onClick={onNext} className="col-span-2 rounded-full bg-sage py-3.5 font-medium text-surface">
+        <button type="button" onClick={onUndo} className="rounded-full bg-canvas py-3 font-medium text-ink">
+          Undo
+        </button>
+        <button type="button" onClick={onNext} className="col-span-3 rounded-full bg-sage py-3.5 font-medium text-surface">
           Listen again
         </button>
       </div>

@@ -5,8 +5,8 @@ import { navigate, useRoute } from './lib/router'
 import { usePatient } from './lib/store'
 import Home from './pages/Home'
 import NewPatient from './pages/NewPatient'
-import PatientApp from './pages/PatientApp'
 import PatientPage from './pages/PatientPage'
+import Talk from './pages/Talk'
 import Teach from './pages/Teach'
 
 function VoicePage({ id }: { id: string }) {
@@ -30,7 +30,7 @@ export default function App() {
     case 'patient':
       return <PatientPage id={route.id} />
     case 'talk':
-      return <PatientApp />
+      return <Talk id={route.id} board={route.board} />
     case 'teach':
       return <Teach id={route.id} />
     case 'voice':
