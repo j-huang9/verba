@@ -1,0 +1,63 @@
+@import 'tailwindcss';
+
+/* Design system. Source of truth: CLAUDE.md "Design system". Use these as Tailwind
+   classes (bg-canvas, text-ink, font-phrase, text-phrase, ...), never raw hex. */
+@theme {
+  --font-phrase: 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --color-canvas: #f6f3ec;
+  --color-surface: #ffffff;
+  --color-ink: #1e2a2f;
+  --color-muted: #6b7a80;
+  --color-line: #e9e1d3;
+  --color-sage: #5b8a72;
+  --color-sage-soft: #dce8e0;
+  --color-sky: #7fa7c9;
+  --color-coral: #e46f5c; /* urgent: nurse view only, never on the bedside screen */
+  --color-coral-soft: #fbe3de;
+
+  --text-phrase: 6rem; /* confirmed phrase, bedside */
+  --text-phrase--line-height: 1.05;
+  --text-candidate: 2.75rem; /* candidate cards, bedside */
+  --text-candidate--line-height: 1.15;
+
+  --radius-card: 1.75rem;
+  --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-canvas: #12181b;
+    --color-surface: #1b2328;
+    --color-ink: #eef2f0;
+    --color-muted: #94a3a8;
+    --color-line: #2a343a;
+    --color-sage: #7fb394;
+    --color-sage-soft: #23352c;
+    --color-sky: #9cc0de;
+    --color-coral: #f08a78;
+    --color-coral-soft: #3a2420;
+  }
+}
+:root[data-theme='dark'] {
+  --color-canvas: #12181b;
+  --color-surface: #1b2328;
+  --color-ink: #eef2f0;
+  --color-muted: #94a3a8;
+  --color-line: #2a343a;
+  --color-sage: #7fb394;
+  --color-sage-soft: #23352c;
+  --color-sky: #9cc0de;
+  --color-coral: #f08a78;
+  --color-coral-soft: #3a2420;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+}

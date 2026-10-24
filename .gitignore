@@ -1,0 +1,27 @@
+# secrets
+.env
+.env.local
+.env.*.local
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# engine artifacts (recorded faces + models stay local)
+engine/data/*
+!engine/data/.gitkeep
+engine/models/*
+!engine/models/.gitkeep
+engine/reports/*
+!engine/reports/.gitkeep
+
+# web
+node_modules/
+dist/
+*.log
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/
