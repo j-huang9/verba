@@ -155,10 +155,17 @@ LogEntry { id; patientId; at; phraseId; text; how: 'lips'|'board'|'scan';
 Plus actions `addPatient`, `updatePatient`, `removePatient`, `addEntry`, `updateEntry` and a `usePatient(id)` hook. `Personal` comes from `engine/mlp.ts`.
 
 **Other cross-owner interfaces (A provides, C uses):**
-- `useLipReader({ personal, onTake })` and the exported `BLINK_CLOSED`, `BLINK_HOLD_MS`, `SHORT_BLINK_MS`, `DOUBLE_BLINK_MS`, `isMock`.
+- `useLipReader({ personal, onTake })`, a new `ranked: Guess[]` field on the lip reader (every class of the last reading, most likely first, after personal calibration), and the exported `BLINK_CLOSED`, `BLINK_HOLD_MS`, `SHORT_BLINK_MS`, `DOUBLE_BLINK_MS`, `isMock`.
 - `voiceUrl(patient, phraseId): Promise<string | null>` from `lib/voice.ts`, and `speak(id, text, src?)` (src undefined = today's `/audio/<id>.mp3`; null = device voice).
 - `<VoiceSetup patientId onDone />` and the `#/p/:id/teach` page.
 - Until A's piece lands, C stubs it (plain `useLipReader()`, `/audio/<id>.mp3`, a placeholder VoiceSetup).
+
+**How the phrase board fits the flow** (lip reading first, the board is the fallback that a wrong read still speeds up):
+1. **Confident read:** it speaks in their voice, the same as now.
+2. **Not sure:** the top 3 guesses, the same as now, plus a fourth option, **"None of these → phrase board"**. "Not right?" on the message sheet also offers it.
+3. **The phrase board opens sorted by what the model thinks is most likely.** The top section, "Likely from their lips", lists the model's remaining phrases by probability, leaving out the guesses they just rejected. Then come Urgent, Their usual and the categories. In blink-scan mode the scan starts at that section. So even when the read is wrong, the right phrase is usually near the top instead of buried among 50. That's the judge point: a wrong read still makes communicating faster.
+   - Honest limit: the model only scores the phrases it was trained on (8 today), so the other 42 can't be ranked by lips. They follow in Urgent, Their usual and category order.
+   - Opened directly from the Board button with no reading, the "Likely" section is hidden.
 
 **Product rules for every flow:** nothing is said in the patient's voice without their yes (confident reading, a blink, or the family tapping after the patient nods), every spoken message can be undone, and every message is logged (undone ones stay in the log, struck through).
 
@@ -180,8 +187,13 @@ Plus actions `addPatient`, `updatePatient`, `removePatient`, `addEntry`, `update
 >   - Back button and a "Calibrated for {name}" pill.
 >   - Log every decided message. Picking another guess under "Not right?" for the same reading updates that entry with `correctedFrom` instead of adding a new one.
 >   - Add **Undo** to MessageSheet (buttons Replay · Not right? · Undo). It stops the audio, marks the entry `undone`, returns to ready and shows "Undone".
-> - **Phrase board** (`components/PhraseBoard.tsx`), opened by a Board button next to Listen. It covers the camera, but the camera keeps running underneath so blinks are still seen.
->   - Sections: Urgent first, then "Their usual" (top 4 from the log), then each category from phrases.json.
+> - **Phrase board** (`components/PhraseBoard.tsx`), opened by a Board button next to Listen, by a fourth option **"None of these → phrase board"** on the ConfirmSheet, and from "Not right?" on the MessageSheet. It covers the camera, but the camera keeps running underneath so blinks are still seen. See "How the phrase board fits the flow" above.
+>   - Sections, top to bottom:
+>     1. **"Likely from their lips"**, only when opened from a reading: phrases from `lr.ranked` sorted by probability, minus the guesses just rejected, each with its % in small muted text. Until A lands `ranked`, use `lr.guesses`.
+>     2. Urgent.
+>     3. "Their usual" (top 4 from the log).
+>     4. Each category from phrases.json.
+>   - Blink scan starts at the first section.
 >   - Big 2-column buttons, plus a small lips icon on the phrases the model can read.
 >   - A face status chip: "Eyes visible" or "Can't see their face".
 >   - **Tap mode:** tapping a phrase opens a confirm panel: "Ask them: '{text}?' Hold eyes closed to say it, or tap Yes if they nod." It has a ConfirmRing driven by the blink hold, plus Yes and Not this.
@@ -199,6 +211,7 @@ Plus actions `addPatient`, `updatePatient`, `removePatient`, `addEntry`, `update
 > **1. Engine hooks (push within 30 min, C needs them).**
 > - `useLipReader(options?: { personal?: Personal | null; onTake?: (x: Float64Array) => void })`. Keep both in refs and predict with `applyPersonal(model, personal)`.
 > - When `onTake` is set (calibration), `finish()` hands `features(seg)` to it instead of predicting (an empty array in `?mock`), then returns to 'ready'. A take with no motion sets the "Didn't catch that" notice.
+> - Add `ranked: Guess[]` to the `LipReader` type and return value: all classes of the last reading, most likely first (`guesses` stays the top 3). The phrase board uses it to sort phrases by likelihood. It's empty before a reading, and in `?mock` it's the scripted guesses.
 > - Export `BLINK_CLOSED`, `BLINK_HOLD_MS`, `SHORT_BLINK_MS`, `DOUBLE_BLINK_MS` and `isMock`.
 > - Keep the golden test passing.
 >
