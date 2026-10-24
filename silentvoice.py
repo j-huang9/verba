@@ -13,6 +13,7 @@ Usage:
   python silentvoice.py train                            # trains on everything in engine/data
   python silentvoice.py train --set core8                # Checkpoint 1 fallback
   python silentvoice.py personal --set core8             # before/after chart for personal calibration
+  python silentvoice.py priors --set core8               # does conversation-aware ranking help?
   (train also writes web/public/model/lipreader.json: the model the phone app runs)
   python silentvoice.py live                             # OpenCV debug window, events printed as JSON
 
@@ -49,6 +50,7 @@ FACE_MODEL = os.path.join(MODELS_DIR, "face_landmarker.task")
 LIP_MODEL = os.path.join(MODELS_DIR, "lipreader.joblib")
 WEB_MODEL = os.path.join(ROOT, "web", "public", "model", "lipreader.json")
 GOLDEN = os.path.join(ROOT, "web", "src", "engine", "golden.json")
+PRIORS_FILE = os.path.join(ROOT, "web", "src", "engine", "priors.json")
 PHRASES_FILE = os.path.join(ROOT, "phrases.json")
 
 # MediaPipe face-mesh indices. Outer lip loop (20) then inner lip loop (20), both clockwise
@@ -532,7 +534,18 @@ def export_web(clf, temperature: float, threshold: float, personal_temperature: 
     Xc = np.vectorize(lambda v: float(f"{v:.6g}"))(Xc)
     yc = np.arange(len(model["classes"]))
     W, b = personalize(model, Xc, yc)
-    golden = {"w": 1280, "h": 720, "points": pts.tolist(), "features": x.tolist(),
+    priors = load_priors()
+    import re
+    probs = softmax(web_logits(model, x)[None])[0]
+    questions = [q for r in priors["rules"] for q in r["examples"]] + ["Good morning."]
+    lifted = [sorted(set(sum((r["phrases"] for r in priors["rules"] if re.search(r["cue"], q, re.I)), []))
+                     | (set(priors["always"]) if any(re.search(r["cue"], q, re.I) for r in priors["rules"]) else set()))
+              for q in questions]
+    golden_priors = {"probs": probs.tolist(), "cases": [
+        {"question": q, "lifted": lf,
+         "probs": rerank(probs, np.isin(model["classes"], lf), priors["boost"]).tolist() if set(lf) & set(model["classes"]) else probs.tolist()}
+        for q, lf in zip(questions, lifted)]}
+    golden = {"w": 1280, "h": 720, "points": pts.tolist(), "features": x.tolist(), "priors": golden_priors,
               "logits": web_logits(model, x).tolist(),
               "personal": {"features": Xc.tolist(), "labels": yc.tolist(),
                            "logits": (web_hidden(model, x) @ W.T + b).tolist()}}
@@ -697,6 +710,76 @@ def cmd_personal(args):
         path = os.path.join(REPORTS_DIR, f"personal_{int(time.time())}.png")
         save_personal_chart(curve, per_person, path)
         print(f"chart -> {path}")
+
+
+# --------------------------------------------------------------------------- conversation priors
+
+def load_priors() -> dict:
+    with open(PRIORS_FILE) as f:
+        return json.load(f)
+
+
+def rerank(probs: np.ndarray, lifted: np.ndarray, boost: float) -> np.ndarray:
+    """Same as rerank() in web/src/engine/priors.ts: lift some phrases, renormalize."""
+    w = probs * np.where(lifted, boost, 1.0)
+    return w / w.sum(axis=-1, keepdims=True)
+
+
+def cmd_priors(args):
+    """Simulate a family member asking a question before each held-out take. 'Relevant': a
+    question whose rule lists the mouthed phrase. 'Unrelated': a rule that doesn't list it
+    (the patient answers something else). Reports both, so the boost can't hide harm."""
+    import re
+
+    priors = load_priors()
+    known = {p["id"] for p in load_phrases()}
+    for r in priors["rules"]:
+        bad = [i for i in r["phrases"] if i not in known]
+        if bad:
+            sys.exit(f"priors.json rule '{r['name']}' names unknown phrases: {bad}")
+        for q in r["examples"]:
+            if not re.search(r["cue"], q, re.I):
+                sys.exit(f"priors.json rule '{r['name']}': example {q!r} does not match its cue")
+    urgent = sorted(p["id"] for p in load_phrases() if p["urgent"])
+    if sorted(priors["always"]) != urgent:
+        sys.exit(f"priors.json `always` should be the urgent phrases: {urgent}")
+    print(f"{len(priors['rules'])} rules OK; every example matches its cue")
+
+    with np.errstate(all="ignore"):
+        ids = None if args.set == "all" else {p["id"] for p in phrase_set(args.set)}
+        seqs, labels, people = load_dataset(ids)
+        result = evaluate(seqs, labels, people, args.aug)
+        if not result:
+            sys.exit("Need more takes to evaluate.")
+        mode, logits, classes = result
+        y = np.searchsorted(classes, labels)
+        probs = softmax(logits, fit_temperature(logits, y))
+        always = np.isin(classes, priors["always"])
+        rule_sets = [np.isin(classes, r["phrases"]) for r in priors["rules"]]
+        rule_sets = [m for m in rule_sets if m.any()]
+        rng = np.random.default_rng(0)
+
+        def scenario(relevant: bool):
+            lifted = np.zeros_like(probs, dtype=bool)
+            for i, c in enumerate(y):
+                pool = [m for m in rule_sets if m[c] == relevant]
+                lifted[i] = (pool[rng.integers(len(pool))] | always) if pool else False
+            return lifted
+
+        sure, right = probs.max(axis=1) >= args.threshold, probs.argmax(axis=1) == y
+        print(f"\n[{mode}] {len(y)} held-out takes; question asked just before each one")
+        print(f"  speaking is decided by the lips alone: speaks right away {sure.mean():.0%}, right {right[sure].mean():.0%}")
+        print(f"  the question then re-orders the confirm sheet (boost in priors.json: {priors['boost']}):")
+        print(f"  {'':34s} {'top-1':>6s} {'top-3':>6s}  urgent phrases top-3")
+        for boost in (1, 2, 3):
+            for name, rel in (("relevant question", True), ("unrelated question", False)):
+                p = rerank(probs, scenario(rel), boost)
+                order = np.argsort(-p, axis=1)
+                t1, t3 = order[:, 0] == y, (order[:, :3] == y[:, None]).any(axis=1)
+                label = "no priors" if boost == 1 else f"boost {boost}, {name}"
+                print(f"  {label:34s} {t1.mean():6.1%} {t3.mean():6.1%}  {t3[always[y]].mean():.0%}")
+                if boost == 1:
+                    break
 
 
 # --------------------------------------------------------------------------- live
@@ -1008,6 +1091,12 @@ def main():
     pc.add_argument("--set", default="all", help="core8 | core12 | ids (default: all recorded)")
     pc.add_argument("--aug", type=int, default=4)
     pc.set_defaults(fn=cmd_personal)
+
+    pr = sub.add_parser("priors", help="check priors.json and measure conversation-aware ranking")
+    pr.add_argument("--set", default="all", help="core8 | core12 | ids (default: all recorded)")
+    pr.add_argument("--aug", type=int, default=4)
+    pr.add_argument("--threshold", type=float, default=0.7)
+    pr.set_defaults(fn=cmd_priors)
 
     lv = sub.add_parser("live", help="run live with the OpenCV debug window")
     lv.add_argument("--cam", type=int, default=0)

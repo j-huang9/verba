@@ -1,0 +1,80 @@
+{
+  "_comment": "Conversation-aware ranking (owner: Computer A). When the family's question matches a cue (case-insensitive regex), the listed phrases become `boost` times more likely before the lip reader's guesses are re-ranked. `always` (the urgent phrases) are lifted whenever any rule matches, so a question can never push down I can't breathe. Re-ranking only reorders the confirm sheet: the app decides whether to speak from the lip reader alone. Ids must exist in phrases.json. `examples` are test questions: each must match its own cue. Evaluate with `python silentvoice.py priors --set core8`.",
+  "version": 1,
+  "boost": 2,
+  "always": ["in_pain", "cant_breathe", "suction", "call_nurse", "choking", "chest_pain", "feel_sick", "dizzy", "tube_hurts"],
+  "rules": [
+    {
+      "name": "yes/no question",
+      "cue": "^\\s*(are|is|do|does|did|can|could|would|will|should|have|has|want)\\b|\\b(right|okay|ok)\\s*\\??\\s*$",
+      "phrases": ["yes", "no"],
+      "examples": ["Are you okay?", "Do you want some water?", "Can you hear me?", "You're comfortable, right?"]
+    },
+    {
+      "name": "pain",
+      "cue": "\\b(pain|hurt|hurts|hurting|sore|ache|aching|uncomfortable)\\b",
+      "phrases": ["in_pain", "yes", "no", "chest_pain", "tube_hurts", "more_pain_meds"],
+      "examples": ["Are you in pain?", "Does it hurt?", "Where does it hurt?", "Are you uncomfortable?"]
+    },
+    {
+      "name": "breathing",
+      "cue": "\\b(breath|breathe|breathing|air|oxygen|choking|cough)\\b",
+      "phrases": ["cant_breathe", "suction", "choking", "yes", "no", "call_nurse"],
+      "examples": ["Can you breathe okay?", "Are you getting enough air?", "How's your breathing?"]
+    },
+    {
+      "name": "how are you",
+      "cue": "\\b(how are you|how do you feel|how're you|how you doing|feeling|feel)\\b",
+      "phrases": ["in_pain", "scared", "cold", "hot", "tired", "better", "dizzy", "feel_sick", "thirsty"],
+      "examples": ["How are you feeling?", "How do you feel?", "How you doing, sweetheart?"]
+    },
+    {
+      "name": "needs",
+      "cue": "\\b(need|want|anything|get you|can i|what can|help)\\b",
+      "phrases": ["thirsty", "cold", "suction", "call_nurse", "bathroom", "blanket", "move_me", "more_pain_meds", "where_mom", "where_family"],
+      "examples": ["Do you need anything?", "What can I get you?", "Is there anything I can do to help?"]
+    },
+    {
+      "name": "drink",
+      "cue": "\\b(water|drink|thirsty|ice|juice|mouth)\\b",
+      "phrases": ["thirsty", "mouth_dry", "yes", "no"],
+      "examples": ["Do you want water?", "Are you thirsty?", "Want some ice chips?"]
+    },
+    {
+      "name": "temperature",
+      "cue": "\\b(cold|warm|hot|chilly|blanket|temperature|freezing)\\b",
+      "phrases": ["cold", "hot", "blanket", "yes", "no"],
+      "examples": ["Are you cold?", "Do you want a blanket?", "Is it too warm in here?"]
+    },
+    {
+      "name": "fear",
+      "cue": "\\b(scared|afraid|worried|nervous|frightened|anxious)\\b",
+      "phrases": ["scared", "stay_with_me", "am_i_ok", "yes", "no"],
+      "examples": ["Are you scared?", "Are you worried?", "Don't be afraid, okay?"]
+    },
+    {
+      "name": "family",
+      "cue": "\\b(who|mom|mother|mama|dad|father|family|visit|see|here)\\b",
+      "phrases": ["where_mom", "where_family", "where_dad", "call_family", "love_you"],
+      "examples": ["Who do you want to see?", "Do you want me to call your mom?", "Mom is on her way, okay?"]
+    },
+    {
+      "name": "affection",
+      "cue": "\\b(love you|miss you|here for you|with you|proud of you)\\b",
+      "phrases": ["love_you", "thank_you", "stay_with_me"],
+      "examples": ["I love you.", "We're all here for you.", "I'm right here with you."]
+    },
+    {
+      "name": "after helping",
+      "cue": "\\b(here you go|there you go|i got you|got it|is that better|that better|all done|fixed)\\b",
+      "phrases": ["thank_you", "better", "yes", "no"],
+      "examples": ["Here you go.", "Is that better?", "There you go, all done."]
+    },
+    {
+      "name": "nurse",
+      "cue": "\\b(nurse|doctor|call someone|get someone)\\b",
+      "phrases": ["call_nurse", "doctor", "yes", "no"],
+      "examples": ["Should I get the nurse?", "Do you want me to call someone?"]
+    }
+  ]
+}
