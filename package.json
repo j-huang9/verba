@@ -1,0 +1,13 @@
+{
+  "name": "silent-voice",
+  "private": true,
+  "description": "Convenience scripts so npm commands work from the repo root. The app lives in web/.",
+  "scripts": {
+    "postinstall": "npm --prefix web install",
+    "dev": "npm --prefix web run dev",
+    "dev:phone": "npm --prefix web run dev:phone",
+    "build": "npm --prefix web run build",
+    "audio": "npm --prefix web run audio",
+    "test:engine": "npm --prefix web run test:engine"
+  }
+}
