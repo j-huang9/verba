@@ -51,6 +51,12 @@ export interface LipReader {
   facing: 'user' | 'environment'
   /** top-3 guesses after listening (confirming and done phases) */
   guesses: Guess[]
+  /**
+   * every phrase the model scored in the last reading, most likely first (after personal
+   * calibration). The phrase board sorts its "Likely from their lips" section by this.
+   * Empty before a reading and while listening.
+   */
+  ranked: Guess[]
   selected: number
   /** eyes-closed hold progress toward confirming guesses[selected], 0..1 */
   blinkProgress: number

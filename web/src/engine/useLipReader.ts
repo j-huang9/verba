@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadModel, predict, type LipModel } from './classifier'
 import { features, MIN_FRAMES, motion, N_LIPS, normalize, type NormFrame } from './features'
+import { applyPersonal, type Personal } from './mlp'
 import { startMockFeed, mockResult } from './mock'
 import { createTracker, type Tracker, type TrackerFrame } from './tracker'
 import type { Guess, LipReader, Message, Phase, TrackedFace } from './types'
@@ -13,15 +14,16 @@ const MOTION_ON_FLOOR = 0.006 // counts as mouthing above max(this, baseline * 2
 const QUIET_MS = 900 // auto-stop after the mouth is still this long...
 const MIN_LISTEN_MS = 700 // ...but never before this
 const MAX_LISTEN_MS = 6000
-const BLINK_CLOSED = 0.45 // eyeBlink blendshape average
-const BLINK_HOLD_MS = 1000 // eyes closed this long = confirm
-const SHORT_BLINK_MS = 500 // two short blinks within DOUBLE_BLINK_MS = next guess
-const DOUBLE_BLINK_MS = 800
+export const BLINK_CLOSED = 0.45 // eyeBlink blendshape average
+export const BLINK_HOLD_MS = 1000 // eyes closed this long = confirm
+export const SHORT_BLINK_MS = 500 // two short blinks within DOUBLE_BLINK_MS = next guess
+export const DOUBLE_BLINK_MS = 800
 const DEFAULT_THRESHOLD = 0.6
 
 interface Machine {
   phase: Phase
   guesses: Guess[]
+  ranked: Guess[]
   selected: number
   message: Message | null
   notice: string | null
@@ -68,9 +70,20 @@ export interface DebugStats {
   stopReason: StopReason | null
 }
 
-const isMock = () => new URLSearchParams(window.location.search).has('mock')
+export const isMock = () => new URLSearchParams(window.location.search).has('mock')
 
-export function useLipReader(): LipReader & {
+export interface LipReaderOptions {
+  /** this patient's calibration (from personalize()); null = the shared model */
+  personal?: Personal | null
+  /**
+   * Calibration mode ("Teach it their lips"): each finished take is handed over as its feature
+   * vector instead of being read (an empty array in ?mock), and the reader goes back to 'ready'.
+   * A take with no mouth movement sets the "Didn't catch that" notice and isn't handed over.
+   */
+  onTake?: (x: Float64Array) => void
+}
+
+export function useLipReader(options: LipReaderOptions = {}): LipReader & {
   mock: boolean
   simulateBlink: (closed: boolean) => void
   readDebug: () => DebugStats
@@ -85,6 +98,7 @@ export function useLipReader(): LipReader & {
   const [snap, setSnap] = useState({
     phase: 'loading' as Phase,
     guesses: [] as Guess[],
+    ranked: [] as Guess[],
     selected: 0,
     message: null as Message | null,
     notice: null as string | null,
@@ -97,8 +111,12 @@ export function useLipReader(): LipReader & {
   const trackerRef = useRef<Tracker | null>(null)
   const modelRef = useRef<LipModel | null>(null)
   const mockBlink = useRef(false)
+  const personalRef = useRef<Personal | null>(null)
+  const onTakeRef = useRef<LipReaderOptions['onTake']>(undefined)
+  personalRef.current = options.personal ?? null
+  onTakeRef.current = options.onTake
   const m = useRef<Machine>({
-    phase: 'loading', guesses: [], selected: 0, message: null, notice: null, segment: [], prev: null,
+    phase: 'loading', guesses: [], ranked: [], selected: 0, message: null, notice: null, segment: [], prev: null,
     energy: 0, baseline: 0.002, motionSeen: false, listenStart: 0, lastMotion: 0, closedSince: null,
     latched: false, lastShortBlink: 0, blinkProgress: 0, lastPublish: 0, face: false,
     fps: 0, lastFrame: 0, blink: 0, segFrames: 0, segMs: 0, stopReason: null,
@@ -107,7 +125,7 @@ export function useLipReader(): LipReader & {
   const publish = useCallback(() => {
     const s = m.current
     s.lastPublish = performance.now()
-    setSnap({ phase: s.phase, guesses: s.guesses, selected: s.selected, message: s.message,
+    setSnap({ phase: s.phase, guesses: s.guesses, ranked: s.ranked, selected: s.selected, message: s.message,
       notice: s.notice, blinkProgress: s.blinkProgress, face: s.face })
   }, [])
 
@@ -128,17 +146,28 @@ export function useLipReader(): LipReader & {
     s.segFrames = seg.length
     s.segMs = performance.now() - s.listenStart
     s.stopReason = reason
+    const caught = seg.length >= MIN_FRAMES && s.motionSeen
+    const onTake = onTakeRef.current
+    if (onTake) {
+      if (mock) onTake(new Float64Array(0))
+      else if (caught) onTake(features(seg))
+      else s.notice = 'Didn’t catch that. Try again'
+      s.phase = 'ready'
+      publish()
+      return
+    }
     let ranked: Guess[] | null = null
     if (mock) ranked = mockResult()
     else if (!modelRef.current) s.notice = 'No lip model yet. Train on the Pro Max, or open with ?mock'
-    else if (seg.length < MIN_FRAMES || !s.motionSeen) s.notice = 'Didn’t catch that. Try again'
-    else ranked = predict(modelRef.current, features(seg))
+    else if (!caught) s.notice = 'Didn’t catch that. Try again'
+    else ranked = predict(applyPersonal(modelRef.current, personalRef.current), features(seg))
 
     if (!ranked) {
       s.phase = 'ready'
       publish()
       return
     }
+    s.ranked = ranked
     s.guesses = ranked.slice(0, 3)
     s.selected = 0
     s.closedSince = null
@@ -301,7 +330,7 @@ export function useLipReader(): LipReader & {
     const s = m.current
     if (s.phase === 'loading' || s.phase === 'error') return
     Object.assign(s, { phase: 'listening', segment: [], motionSeen: false, listenStart: performance.now(),
-      lastMotion: 0, message: null, notice: null, guesses: [], blinkProgress: 0 })
+      lastMotion: 0, message: null, notice: null, guesses: [], ranked: [], blinkProgress: 0 })
     publish()
   }, [publish])
 
