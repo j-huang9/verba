@@ -1,14 +1,14 @@
-# Silent Voice
+# Verba
 
 **Speech for patients on a breathing tube, in their own voice.**
 
-ICU patients on a ventilator are often fully awake but can't make a sound. Today they point at letter boards. Silent Voice is a phone app:
+ICU patients on a ventilator are often fully awake but can't make a sound. Today they point at letter boards. Verba is a phone app:
 1. A family member points the camera at the patient and taps **Listen**.
 2. The patient silently mouths a phrase.
 3. The phone reads their lips on the device, shows **how confident it is**, and speaks the phrase **in the patient's own cloned voice** (Cartesia).
 4. When it isn't sure, it doesn't guess out loud. It asks the patient to confirm with a **long blink**.
 
-**Live demo:** https://silent-voice-one.vercel.app. Open it on a phone and add it to the home screen. Add `?mock` to try the flow without a camera or a trained face.
+**Live demo:** https://verba-voice.vercel.app. Open it on a phone and add it to the home screen. Add `?mock` to try the flow without a camera or a trained face.
 
 Built at Cal Hacks 2026.
 

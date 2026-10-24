@@ -1,5 +1,5 @@
 {
-  "name": "silent-voice",
+  "name": "verba",
   "private": true,
   "description": "Convenience scripts so npm commands work from the repo root. The app lives in web/.",
   "scripts": {

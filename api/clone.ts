@@ -33,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
     return fail(400, 'Expected multipart form data with a clip')
   }
   const clip = form.get('clip')
-  const name = String(form.get('name') ?? '').trim().slice(0, 80) || 'Silent Voice patient'
+  const name = String(form.get('name') ?? '').trim().slice(0, 80) || 'Verba patient'
   if (!(clip instanceof Blob) || clip.size === 0) return fail(400, 'Missing clip')
   if (clip.size > MAX_BYTES) return fail(413, 'Clip is too large (keep it under 45 seconds)')
 

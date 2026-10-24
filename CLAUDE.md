@@ -1,4 +1,6 @@
-# Silent Voice
+# Verba
+
+**Name:** the app is **Verba** (it was called Silent Voice). Use "Verba" in all UI text. Internal ids keep the old name on purpose: `silentvoice.py`, the localStorage key `silentvoice:v1` and the cache `silentvoice-voices-v1` (renaming those would wipe saved patients and voices).
 
 Speech for ICU patients on breathing tubes. They're awake but can't talk. **It's one phone app.** A family member points the phone's camera at the patient and taps **Listen**, then the patient silently mouths a phrase. The app reads their lips on the phone itself and shows a **confidence bar**. Then one of two things happens:
 - **Confident** (at or above the threshold, default 70%): it speaks the phrase in a clone of the patient's own voice (Cartesia), with the message on screen.
@@ -86,7 +88,7 @@ npm run dev          # http://localhost:5173 (laptop webcam works on localhost).
 npm run dev:phone    # https://<LAN-IP>:5173 for a phone on the same Wi-Fi
 npm run audio        # pre-generate cloned voice (needs CARTESIA_API_KEY + CARTESIA_VOICE_ID in web/.env.local)
 ```
-Deploy: **automatic on every push to `main`** (Jenna's Vercel project, root directory `./`; `vercel.json` builds `web/` and needs the root `phrases.json`). Live at https://silent-voice-one.vercel.app. Then open the URL on the phone and add it to the home screen. Add `?debug` for the tuning overlay.
+Deploy: **automatic on every push to `main`** (Jenna's Vercel project, root directory `./`; `vercel.json` builds `web/` and needs the root `phrases.json`). Live at https://verba-voice.vercel.app (the old https://silent-voice-one.vercel.app still works). Then open the URL on the phone and add it to the home screen. Add `?debug` for the tuning overlay.
 
 ## The lip reader
 

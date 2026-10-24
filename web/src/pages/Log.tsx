@@ -12,7 +12,7 @@ function summary(p: Patient, entries: LogEntry[]) {
   const lines = entries
     .filter((e) => !e.undone)
     .map((e) => `${dayLabel(e.at)} ${clock(e.at)}  "${e.text}"  (${entryMeta(e)})`)
-  return [`What ${displayName(p)} said${p.room ? ` (${p.room})` : ''}, from Silent Voice:`, '', ...lines].join('\n')
+  return [`What ${displayName(p)} said${p.room ? ` (${p.room})` : ''}, from Verba:`, '', ...lines].join('\n')
 }
 
 export default function Log({ id }: { id: string }) {

@@ -25,7 +25,7 @@ export function Screen({
               </svg>
             </a>
           ) : (
-            <p className="font-phrase text-xl">Silent Voice</p>
+            <p className="font-phrase text-xl">Verba</p>
           )}
           {action}
         </header>

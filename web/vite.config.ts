@@ -10,7 +10,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
  */
 function apiFunctions(mode: string): Plugin {
   return {
-    name: 'silent-voice-api',
+    name: 'verba-api',
     configureServer(server) {
       Object.assign(process.env, loadEnv(mode, process.cwd(), 'CARTESIA_'))
       server.middlewares.use(async (req, res, next) => {
