@@ -77,7 +77,7 @@ python silentvoice.py train                       # accuracy + confidence report
 cd web && npm run test:engine                     # must print PASS
 git add web/public/model web/src/engine/golden.json && git commit -m "model: …" && git push
 ```
-**Record with an iPhone as the camera** (macOS Continuity Camera, `--cam 1` or `--cam 2`) for at least some takes. The app runs on phone cameras, so phone-camera training data closes the domain gap. Hold it the way a family member would: in front of the face, slightly below it.
+**Optional, after the first model: record with an iPhone as the Mac's camera** (macOS Continuity Camera, `--cam 1` or `--cam 2`). It's still the same `record` command on the Mac. The app runs on phone cameras, so phone-camera training data closes the domain gap. Hold it the way a family member would: in front of the face, slightly below it.
 
 **App (C, and anyone testing it).**
 ```bash
@@ -126,7 +126,7 @@ Clone the voice in the Cartesia playground from about 10 s of clean audio. For t
 **8:45–10:30 PM, Block 1**
 - **A:**
   - Set up Python and get `record` working.
-  - Record every teammate on core12 × 12. Use the laptop camera, plus the iPhone through Continuity Camera for at least 4 reps each.
+  - Record every teammate on core12 × 12 with the Mac's own webcam: one person at a time, sitting in front of the Mac.
   - Run the first `train` and push `lipreader.json`.
 - **C:**
   - Deploy to Vercel and open the app on a real iPhone with `?mock`.
@@ -144,6 +144,7 @@ Clone the voice in the Cartesia playground from about 10 s of clean audio. For t
 
 **10:30 PM–1:30 AM, Block 2**
 - **A:**
+  - Optional: add 3–4 reps per person through an iPhone used as the Mac's webcam (Continuity Camera, `--cam 1`). It's still the same `record` command on the Mac, not a separate phone recording, and it makes the training footage look like the app's phone camera.
   - Pick the threshold from the confidence report.
   - Do error analysis: find which phrase pairs get confused. Re-record the worst pairs, or swap a phrase for one that looks more distinct on the lips.
   - Optionally compare a one-hidden-layer MLP against the logistic regression under leave-one-person-out. Switch only if it wins by more than 5 points, and update `classifier.ts` and the golden test to match.
@@ -184,7 +185,7 @@ This is the "Most Technically Advanced" headline: the model adapts to each patie
 
 ## Ready-made prompts (paste after `/clear`)
 
-**A, Block 1:** Read CLAUDE.md. I'm Computer A. Set up the Python environment and get `python silentvoice.py record` working on this Mac. Then help me record via the iPhone with Continuity Camera (find the right `--cam` index). After recording, run `train`, explain the accuracy and confidence report, and run `cd web && npm run test:engine`. Commit `web/public/model/lipreader.json` and `web/src/engine/golden.json`.
+**A, Block 1:** Read CLAUDE.md. I'm Computer A. Set up the Python environment and get `python silentvoice.py record` working with this Mac's built-in webcam. Recording is just one teammate at a time sitting in front of the Mac, silently mouthing the phrase shown on screen (SPACE to start and stop each take). It saves lip points, not video. After everyone has recorded, run `train`, explain the accuracy and confidence report, and commit `web/public/model/lipreader.json` and `web/src/engine/golden.json`. (iPhone-camera takes are an optional extra for Block 2. Skip them now.)
 
 **A, Block 2:** Read CLAUDE.md. Add error analysis to `train`: a confusion matrix chart and the 5 most-confused phrase pairs. Then compare a one-hidden-layer MLP against the current logistic regression under leave-one-person-out. Only if the MLP wins by more than 5 points: export it, port the forward pass to `web/src/engine/classifier.ts`, and extend the golden test.
 
