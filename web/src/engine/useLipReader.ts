@@ -113,8 +113,10 @@ export function useLipReader(options: LipReaderOptions = {}): LipReader & {
   const mockBlink = useRef(false)
   const personalRef = useRef<Personal | null>(null)
   const onTakeRef = useRef<LipReaderOptions['onTake']>(undefined)
-  personalRef.current = options.personal ?? null
-  onTakeRef.current = options.onTake
+  useEffect(() => {
+    personalRef.current = options.personal ?? null
+    onTakeRef.current = options.onTake
+  })
   const m = useRef<Machine>({
     phase: 'loading', guesses: [], ranked: [], selected: 0, message: null, notice: null, segment: [], prev: null,
     energy: 0, baseline: 0.002, motionSeen: false, listenStart: 0, lastMotion: 0, closedSince: null,

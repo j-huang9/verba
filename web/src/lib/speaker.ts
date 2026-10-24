@@ -1,5 +1,8 @@
-// Plays a phrase in the patient's cloned voice: pre-generated /audio/<phrase_id>.mp3
-// (scripts/make-audio.mjs). Falls back to the device voice if the file is missing.
+// Plays a phrase in the patient's voice. speak(id, text, src):
+//   src undefined: the pre-generated /audio/<phrase_id>.mp3 (scripts/make-audio.mjs)
+//   src string:    that audio, e.g. a cloned-voice blob URL from lib/voice.ts voiceUrl()
+//   src null:      the phone's own voice (device-voice patients)
+// Falls back to the device voice if the audio fails, and says so (`fallback`).
 // iOS only allows audio after a user gesture, so call unlockAudio() inside a tap handler.
 // It unlocks both the shared <audio> element and speechSynthesis; after that, iOS lets
 // us play on them later (the voice starts seconds after the tap, once the reading is done).
@@ -62,19 +65,21 @@ export function useSpeaker() {
     setSpeaking(false)
   }, [])
 
-  const speak = useCallback((phraseId: string, text: string) => {
+  const speak = useCallback((phraseId: string, text: string, src?: string | null) => {
     stop()
     const mine = ++token.current
-    const fallBackToDevice = () => {
+    const speakWithDevice = (isFallback: boolean) => {
       if (mine !== token.current || !window.speechSynthesis) return
       token.current++ // ignore any later error events from the <audio> element
       const u = new SpeechSynthesisUtterance(text)
       u.onstart = () => setSpeaking(true)
       u.onend = () => setSpeaking(false)
-      setFallback(true)
+      setFallback(isFallback)
       setStatus('device voice')
       window.speechSynthesis.speak(u)
     }
+    if (src === null) return speakWithDevice(false)
+    const fallBackToDevice = () => speakWithDevice(true)
     audio ??= new Audio()
     const a = audio
     a.onplaying = () => {
@@ -84,7 +89,7 @@ export function useSpeaker() {
     }
     a.onended = () => mine === token.current && setSpeaking(false)
     a.onerror = fallBackToDevice
-    a.src = `/audio/${phraseId}.mp3`
+    a.src = src ?? `/audio/${phraseId}.mp3`
     setFallback(false)
     setStatus('loading clone')
     a.play().catch((e: Error) => {
