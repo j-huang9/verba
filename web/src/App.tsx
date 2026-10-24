@@ -4,6 +4,7 @@ import { VoiceSetup } from './components/VoiceSetup'
 import { navigate, useRoute } from './lib/router'
 import { usePatient } from './lib/store'
 import Home from './pages/Home'
+import Log from './pages/Log'
 import NewPatient from './pages/NewPatient'
 import PatientPage from './pages/PatientPage'
 import Talk from './pages/Talk'
@@ -36,10 +37,6 @@ export default function App() {
     case 'voice':
       return <VoicePage id={route.id} />
     case 'log':
-      return (
-        <Screen back={`/p/${route.id}`} title="Conversation">
-          <p className="mt-3 text-muted">Coming soon.</p>
-        </Screen>
-      )
+      return <Log id={route.id} />
   }
 }
