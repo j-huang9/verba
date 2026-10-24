@@ -474,7 +474,8 @@ class LiveEngine:
                 if face is not None:
                     if now - last_lips >= self.lips_interval:
                         self.emit({"type": "lips", "t": _ms(), "points": face.lips_xy,
-                                   "mouth_open": round(self._mouth_open(face), 3)})
+                                   "mouth_open": round(self._mouth_open(face), 3),
+                                   "aspect": round(face.w / face.h, 4)})
                         last_lips = now
                     self._step(face, now)
                 frames += 1

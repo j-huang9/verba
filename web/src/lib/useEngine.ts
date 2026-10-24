@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ENGINE_URL, type Candidate, type ConfirmedEvent, type EngineCommand, type EngineEvent, type Mode } from './events'
 import { startMockEngine } from './mockEngine'
 
+export interface LipsFrame {
+  points: [number, number][]
+  aspect: number
+}
+
 export interface EngineState {
   connected: boolean
   source: 'engine' | 'mock'
@@ -31,15 +36,17 @@ const initial: EngineState = {
 export function useEngine(opts: { onConfirmed?: (e: ConfirmedEvent) => void } = {}) {
   const [state, setState] = useState<EngineState>(initial)
   /** Latest lip points. Read this in a requestAnimationFrame loop; it does not trigger renders. */
-  const lipsRef = useRef<[number, number][] | null>(null)
+  const lipsRef = useRef<LipsFrame | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const onConfirmedRef = useRef(opts.onConfirmed)
-  onConfirmedRef.current = opts.onConfirmed
+  useEffect(() => {
+    onConfirmedRef.current = opts.onConfirmed
+  })
 
   const handle = useCallback((e: EngineEvent, source: 'engine' | 'mock') => {
     switch (e.type) {
       case 'lips':
-        lipsRef.current = e.points
+        lipsRef.current = { points: e.points, aspect: e.aspect ?? 16 / 9 }
         return
       case 'status':
         setState((s) => ({ ...s, source, mode: e.mode, face: e.face, modelLoaded: e.model_loaded }))

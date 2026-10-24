@@ -70,7 +70,8 @@ Transport: WebSocket `ws://<engine-host>:8765`, one JSON object per message. Eve
 ```jsonc
 // ~20 fps while a face is visible. 40 [x, y] points in 0..1 camera-frame coords, NOT mirrored.
 // points[0..19] = outer lip loop, points[20..39] = inner loop. Draw mirrored: x -> 1 - x.
-{ "type": "lips", "t": 0, "points": [[0.47, 0.63], ...], "mouth_open": 0.12 }
+// aspect = frame width / height; multiply x by it before drawing or the mouth looks squished.
+{ "type": "lips", "t": 0, "points": [[0.47, 0.63], ...], "mouth_open": 0.12, "aspect": 1.7778 }
 
 // After a mouthing segment, whenever the highlight moves, and with top3: [] when cleared.
 { "type": "candidates", "t": 0, "selected": 0,

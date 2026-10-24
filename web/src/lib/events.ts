@@ -10,6 +10,8 @@ export interface LipsEvent {
   t: number
   points: [number, number][]
   mouth_open: number
+  /** frame width / height. Multiply x by this before drawing. */
+  aspect: number
 }
 
 export interface Candidate {

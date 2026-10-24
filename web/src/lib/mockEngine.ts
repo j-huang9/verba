@@ -34,7 +34,7 @@ export function startMockEngine(emit: (e: EngineEvent) => void): () => void {
     const target = SCRIPT[round % SCRIPT.length]
     const mouthing = phase === 'mouthing'
     const open = mouthing ? Math.max(0, Math.sin(el * 9)) * 0.9 : 0.05
-    emit({ type: 'lips', t: now(), points: lipPoints(open, mouthing ? 0 : 0.3), mouth_open: open * 0.6 })
+    emit({ type: 'lips', t: now(), points: lipPoints(open, mouthing ? 0 : 0.3), mouth_open: open * 0.6, aspect: 16 / 9 })
 
     const next = (p: typeof phase) => {
       phase = p
