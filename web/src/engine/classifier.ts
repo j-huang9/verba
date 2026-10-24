@@ -1,5 +1,6 @@
 // Runs the model exported by `python silentvoice.py train` (web/public/model/lipreader.json).
-// The scaler is folded into the weights, so logits = coef @ x + intercept.
+// The scaler is folded into the weights. Version 2 (MLP): h = relu(hidden.coef @ x + hidden.intercept),
+// logits = coef @ h + intercept. Version 1 (logistic regression, no `hidden`): logits = coef @ x + intercept.
 import { LIPS, REF } from './features'
 import { PHRASE_BY_ID } from '../lib/phrases'
 import type { Guess } from './types'
@@ -13,8 +14,18 @@ export interface LipModel {
   temperature: number
   /** speak right away at or above this confidence, else ask the patient to confirm */
   threshold: number
+  /** MLP hidden layer, [units][features]. Absent in version-1 (linear) models. */
+  hidden?: { intercept: number[]; coef: number[][] }
   intercept: number[]
   coef: number[][]
+}
+
+function affine(coef: number[][], intercept: number[], x: ArrayLike<number>): number[] {
+  return coef.map((w, i) => {
+    let z = intercept[i]
+    for (let j = 0; j < w.length; j++) z += w[j] * x[j]
+    return z
+  })
 }
 
 export async function loadModel(url = '/model/lipreader.json'): Promise<LipModel | null> {
@@ -29,11 +40,8 @@ export async function loadModel(url = '/model/lipreader.json'): Promise<LipModel
 }
 
 export function logits(model: LipModel, x: Float64Array): number[] {
-  return model.coef.map((w, c) => {
-    let z = model.intercept[c]
-    for (let j = 0; j < w.length; j++) z += w[j] * x[j]
-    return z
-  })
+  const h = model.hidden ? affine(model.hidden.coef, model.hidden.intercept, x).map((v) => Math.max(v, 0)) : x
+  return affine(model.coef, model.intercept, h)
 }
 
 /** All classes, most likely first, with temperature-calibrated probabilities. */

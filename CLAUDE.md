@@ -1,7 +1,7 @@
 # Silent Voice
 
 Speech for ICU patients on breathing tubes. They're awake but can't talk. **It's one phone app.** A family member points the phone's camera at the patient and taps **Listen**, then the patient silently mouths a phrase. The app reads their lips on the phone itself and shows a **confidence bar**. Then one of two things happens:
-- **Confident** (at or above the threshold, default 60%): it speaks the phrase in a clone of the patient's own voice (Cartesia), with the message on screen.
+- **Confident** (at or above the threshold, default 70%): it speaks the phrase in a clone of the patient's own voice (Cartesia), with the message on screen.
 - **Not sure** (below the threshold): it shows "Not entirely sure" with its top guesses. The family member asks "Did you mean this?", and the patient **holds their eyes closed** to confirm or **blinks twice** for the next guess. Tapping a guess also works.
 
 **Demo moment:** a teammate with a scarf over their throat silently mouths "Where's my mom?" The confidence bar fills to 86%, and the room hears it in their own voice.
@@ -93,7 +93,7 @@ Deploy: `cd web && npx vercel`, with the root directory set to `web/`. Then open
 - **Tracking:** MediaPipe Face Landmarker in VIDEO mode with blendshapes. Per frame it takes 40 lip points (outer loop, then inner loop, each clockwise from the left corner) plus the outer eye corners, nose tip and chin.
 - **Normalization:** origin at the nose tip, x-axis along the eye line, and one unit equals the eye-corner distance. This removes head position, roll and distance.
 - **Features:** each take is resampled to 24 frames, then combined as motion around the mean shape, velocity × 4 and the mean shape, for 3,840 dimensions in total.
-- **Classifier:** StandardScaler followed by LogisticRegression(C=0.05), trained on 4 jittered augmentations per take. The export folds the scaler into the weights.
+- **Classifier:** StandardScaler followed by a one-hidden-layer MLP (128 ReLU units, alpha=3), trained on 4 jittered augmentations per take. It beat LogisticRegression by about 12 points top-1 under leave-one-person-out. The export folds the scaler into the hidden layer, and `classifier.ts` runs the forward pass (it still accepts version-1 linear models).
 - **Confidence:** temperature scaling is fitted on held-out predictions, so "86% sure" means it's right about 86% of the time at that level. `train` prints how often the app will speak right away and how often it's right when it does. Tune `--threshold` from that report; it's exported in `lipreader.json`.
 - **Evaluation:** with 2 or more people it uses leave-one-person-out, which is the honest number for strangers; otherwise it uses k-fold.
 - **Segmentation in the app:** after Listen, a capture auto-stops once the mouth has moved and then stayed still for 0.9 s, or when the family member taps stop. Tuning constants are at the top of `useLipReader.ts`.

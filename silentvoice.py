@@ -18,9 +18,9 @@ Usage:
 How it works:
   MediaPipe Face Landmarker -> 40 lip points + 4 reference points per frame.
   Each take is normalized (nose-centred, eye-line rotated, scaled by eye distance),
-  resampled to a fixed length, and turned into a feature vector. A regularized
-  logistic regression picks the phrase. That is fast to train (seconds) and needs
-  little data. Swap in a small GRU/1D-CNN later if there is time.
+  resampled to a fixed length, and turned into a feature vector. A small MLP (one
+  hidden ReLU layer, strong L2) picks the phrase. It beat logistic regression by
+  ~12 points top-1 under leave-one-person-out and still trains in seconds.
 
 Live mode emits events in the format defined in CLAUDE.md ("Event contract").
 engine/server.py (Block 2) wraps LiveEngine and forwards the events over a WebSocket.
@@ -64,6 +64,7 @@ I_INNER_TOP, I_INNER_BOTTOM = N_LIPS - 5, 25  # landmarks 13 and 14
 
 SEQ_LEN = 24          # frames per take after resampling
 MIN_FRAMES = 8        # shorter takes are discarded
+HIDDEN = 128          # MLP hidden units
 
 
 # --------------------------------------------------------------------------- phrases
@@ -298,11 +299,18 @@ def load_dataset(ids: Optional[set] = None):
 
 
 def make_classifier():
-    from sklearn.linear_model import LogisticRegression
+    from sklearn.neural_network import MLPClassifier
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
 
-    return make_pipeline(StandardScaler(), LogisticRegression(C=0.05, max_iter=3000))
+    return make_pipeline(StandardScaler(), MLPClassifier((HIDDEN,), alpha=3.0, max_iter=400, random_state=0))
+
+
+def raw_logits(clf, X: np.ndarray) -> np.ndarray:
+    """Pre-softmax outputs of the MLP: the same numbers the phone computes."""
+    scaler, mlp = clf.named_steps["standardscaler"], clf.named_steps["mlpclassifier"]
+    h = np.maximum(scaler.transform(X) @ mlp.coefs_[0] + mlp.intercepts_[0], 0)
+    return h @ mlp.coefs_[1] + mlp.intercepts_[1]
 
 
 def fit(seqs, labels, n_aug: int, seed: int = 0):
@@ -339,7 +347,7 @@ def evaluate(seqs, labels, people, n_aug: int):
     for tr, te in folds:
         clf = fit([seqs[i] for i in tr], labels[tr], n_aug)
         cols = np.searchsorted(classes, clf.classes_)  # a fold may miss a class
-        logits[np.ix_(te, cols)] = clf.decision_function(np.stack([features(seqs[i]) for i in te]))
+        logits[np.ix_(te, cols)] = raw_logits(clf, np.stack([features(seqs[i]) for i in te]))
     return mode, logits, classes
 
 
@@ -370,6 +378,28 @@ def save_chart(per_phrase: dict, mode: str, path: str):
     ax.set_ylim(0, 100)
     ax.set_title(f"Per-phrase top-3 accuracy ({mode})")
     plt.xticks(rotation=45, ha="right")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+
+
+def save_confusion(cm: np.ndarray, classes, mode: str, path: str):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    rates = cm / np.maximum(cm.sum(axis=1, keepdims=True), 1)
+    fig, ax = plt.subplots(figsize=(1 + len(classes) * 0.6, 1 + len(classes) * 0.55))
+    ax.imshow(rates, cmap="Greens", vmin=0, vmax=1)
+    for i in range(len(classes)):
+        for j in range(len(classes)):
+            if cm[i, j]:
+                ax.text(j, i, f"{rates[i, j]:.0%}", ha="center", va="center", fontsize=7,
+                        color="white" if rates[i, j] > 0.5 else "#1E2A2F")
+    ax.set_xticks(range(len(classes)), classes, rotation=45, ha="right")
+    ax.set_yticks(range(len(classes)), classes)
+    ax.set_xlabel("predicted")
+    ax.set_ylabel("mouthed")
+    ax.set_title(f"Confusion, top-1 ({mode})")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
 
@@ -413,6 +443,21 @@ def _train(args):
             band = (conf >= lo) & (conf < lo + 0.2 if lo < 0.8 else conf <= 1)
             if band.any():
                 print(f"  says {lo:.0%}-{min(lo + 0.2, 1):.0%} sure: right {top1[band].mean():.0%} of the time ({band.sum()} takes)")
+        print("  threshold sweep (pick with --threshold):")
+        for th in (0.3, 0.4, 0.5, 0.6, 0.7, 0.8):
+            s = conf >= th
+            if s.any():
+                print(f"    {th:.0%}: speaks right away {s.mean():4.0%}, right {top1[s].mean():4.0%} of those ({s.sum()} takes)")
+
+        # Error analysis: which phrases look alike on the lips.
+        pred = order[:, 0]
+        cm = np.zeros((len(classes), len(classes)), dtype=int)
+        np.add.at(cm, (y, pred), 1)
+        pairs = sorted(((cm[i, j] + cm[j, i], classes[i], classes[j]) for i in range(len(classes))
+                        for j in range(i + 1, len(classes))), reverse=True)
+        print("\nmost-confused pairs (top-1 mix-ups, both directions):")
+        for n, a, b in pairs[:5]:
+            print(f"  {a:14s} <-> {b:14s} {n:3d} of {int((labels == a).sum() + (labels == b).sum())} takes")
 
         per_phrase = {c: float(top3[labels == c].mean()) for c in classes}
         for c, acc in sorted(per_phrase.items(), key=lambda kv: kv[1]):
@@ -421,6 +466,9 @@ def _train(args):
         chart = os.path.join(REPORTS_DIR, f"accuracy_{int(time.time())}.png")
         save_chart(per_phrase, mode, chart)
         print(f"chart -> {chart}")
+        confusion = chart.replace("accuracy_", "confusion_")
+        save_confusion(cm, classes, mode, confusion)
+        print(f"confusion -> {confusion}")
         if t3 >= 0.8:
             print("Checkpoint 1: >= 80% top-3. Keep going.")
         elif t3 >= 0.6:
@@ -439,15 +487,18 @@ def export_web(clf, temperature: float, threshold: float):
     """Write the model for the phone app (web/public/model/lipreader.json) plus a golden
     fixture that web/src/engine/golden.test.ts uses to prove the TS port matches Python."""
     scaler = clf.named_steps["standardscaler"]
-    lr = clf.named_steps["logisticregression"]
-    # Fold the scaler into the weights: logits = W @ x + b on raw features.
-    W = lr.coef_ / scaler.scale_
-    b = lr.intercept_ - W @ scaler.mean_
-    sig = lambda a: [float(f"{v:.7g}") for v in a]  # noqa: E731
+    mlp = clf.named_steps["mlpclassifier"]
+    # Fold the scaler into the hidden layer: h = relu(W1 @ x + b1) on raw features,
+    # logits = W2 @ h + b2. 5 significant digits keeps the file small; the golden
+    # fixture is computed from the rounded weights, so the test stays exact.
+    W1 = (mlp.coefs_[0] / scaler.scale_[:, None]).T
+    b1 = mlp.intercepts_[0] - W1 @ scaler.mean_
+    sig = lambda a: [float(f"{v:.5g}") for v in a]  # noqa: E731
     model = {
-        "version": 1, "seq_len": SEQ_LEN, "lips": LIPS, "ref": REF,
+        "version": 2, "seq_len": SEQ_LEN, "lips": LIPS, "ref": REF,
         "classes": clf.classes_.tolist(), "temperature": round(temperature, 4), "threshold": threshold,
-        "intercept": sig(b), "coef": [sig(row) for row in W],
+        "hidden": {"intercept": sig(b1), "coef": [sig(row) for row in W1]},
+        "intercept": sig(mlp.intercepts_[1]), "coef": [sig(row) for row in mlp.coefs_[1].T],
     }
     os.makedirs(os.path.dirname(WEB_MODEL), exist_ok=True)
     with open(WEB_MODEL, "w") as f:
@@ -465,10 +516,16 @@ def export_web(clf, temperature: float, threshold: float):
     pts = np.round(pts, 6)
     x = features(normalize(pts, 1280, 720))
     golden = {"w": 1280, "h": 720, "points": pts.tolist(), "features": x.tolist(),
-              "logits": (np.asarray(model["coef"]) @ x + np.asarray(model["intercept"])).tolist()}
+              "logits": web_logits(model, x).tolist()}
     os.makedirs(os.path.dirname(GOLDEN), exist_ok=True)
     with open(GOLDEN, "w") as f:
         json.dump(golden, f)
+
+
+def web_logits(model: dict, x: np.ndarray) -> np.ndarray:
+    """Forward pass on the exported JSON, exactly as web/src/engine/classifier.ts does it."""
+    h = np.maximum(np.asarray(model["hidden"]["coef"]) @ x + np.asarray(model["hidden"]["intercept"]), 0)
+    return np.asarray(model["coef"]) @ h + np.asarray(model["intercept"])
 
 
 # --------------------------------------------------------------------------- live
@@ -772,7 +829,7 @@ def main():
     t = sub.add_parser("train", help="evaluate + train the phrase classifier")
     t.add_argument("--set", default="all", help="restrict to core8 | core12 | ids (default: all recorded)")
     t.add_argument("--aug", type=int, default=4, help="augmented copies per take")
-    t.add_argument("--threshold", type=float, default=0.6,
+    t.add_argument("--threshold", type=float, default=0.7,
                    help="app speaks right away at or above this confidence, else asks to confirm")
     t.set_defaults(fn=cmd_train)
 

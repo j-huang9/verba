@@ -23,7 +23,11 @@ const x = features(seq)
 
 let worst = 0
 golden.features.forEach((v: number, i: number) => (worst = Math.max(worst, Math.abs(v - x[i]))))
-const logits = (model.coef as number[][]).map((w, c) => w.reduce((z, wj, j) => z + wj * x[j], model.intercept[c]))
+// Same forward pass as classifier.ts (which can't be imported here: it pulls in app modules).
+const affine = (coef: number[][], b: number[], v: ArrayLike<number>) =>
+  coef.map((w, i) => w.reduce((z, wj, j) => z + wj * v[j], b[i]))
+const h = model.hidden ? affine(model.hidden.coef, model.hidden.intercept, x).map((v) => Math.max(v, 0)) : x
+const logits = affine(model.coef, model.intercept, h)
 let worstLogit = 0
 golden.logits.forEach((v: number, i: number) => (worstLogit = Math.max(worstLogit, Math.abs(v - logits[i]))))
 
