@@ -60,9 +60,9 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
    - **Speaks right away without asking: 12% → 33% of the time**
    - **Right phrase in the top 3: 81% → 87%**
 
-   Small text: *measured on people the model never saw*
+   Small text: *measured on people the model never saw · all 4 test subjects improved*
 
-**VO:** "Everyone's lips move differently, especially with a tube in their mouth, so a one-size-fits-all model is often unsure. So, once, the family spends about two minutes on this. The patient mouths each phrase three times, hands-free, and Verba fine-tunes itself to their lips right on the phone. In our tests, every person we tried improved, and Verba could speak right away nearly three times as often, instead of stopping to ask. Two minutes once, for every conversation after."
+**VO:** "Everyone's lips move differently, so once, the family spends two minutes teaching Verba. The patient mouths each phrase three times, and Verba fine-tunes itself right on the phone. Afterward, it can speak right away nearly three times as often, instead of stopping to ask."
 **Caption:** *One-time · about 2 minutes · runs on the phone, nothing uploaded*
 
 *(Why this beat matters: the capture looks repetitive, so the VO answers "why bother" before viewers ask. It's done once per patient, and it makes every later conversation faster: fewer "Did you mean…?" pauses.)*
