@@ -108,13 +108,15 @@ Deploy: **automatic on every push to `main`** (Jenna's Vercel project, root dire
 
 ## Design system
 
-The app is used by a scared family member at a bedside, often one-handed, in a dim room. It should be calm, show one decision at a time, use large type, and never use red.
+The app is used by a scared family member at a bedside, often one-handed, in a dim room. It should be calm, show one decision at a time, use large type, and never use red. The look follows the Verba logo: deep teal and the logo's green on soft mint, with white rounded cards (like modern wellness apps).
 
-- **Type:** Fraunces for phrases (`font-phrase`) and Inter for UI (`font-sans`). Phrases are 36 to 48 px on the phone.
-- **Color tokens** (Tailwind classes, defined in `web/src/index.css`; never use raw hex):
-  `canvas` #F6F3EC · `surface` #FFFFFF is for sheets · `ink` #1E2A2F · `muted` #6B7A80 · `line` #E9E1D3 · `sage` #5B8A72 is confident, primary and confirm · `sage-soft` · `sky` #7FA7C9 is the live lip outline · `honey` #A86B12 is "not entirely sure", a calm amber · `honey-soft`. The `coral` token exists but is unused.
-  Dark mode follows `prefers-color-scheme`. The camera screen itself is always dark.
-- **Layout:** a full-bleed camera, a header with the wordmark, a status pill and a flip-camera button, a big round Listen button at the bottom, and bottom sheets (`rounded-t-[2rem]`) for results. Respect the safe areas.
+- **Logo:** `web/public/brand/`. `logo.png` (stacked) and `logo-horizontal.png` (headers), each with a `-dark` version for dark mode (use the `Logo` component in `components/Screen.tsx`, which switches automatically). `icon-192/512.png`, `apple-touch-icon.png` and `favicon-64.png` are the V mark on white. Brand colours: logo teal #21A08B, slate #44525F.
+- **Type:** Poppins for everything (`font-sans`). Phrases and page titles use `font-phrase`, which is Poppins semibold with slightly tight letter spacing. Phrases are 36 to 48 px on the phone.
+- **Color tokens** (Tailwind classes, defined in `web/src/index.css`; never use raw hex). The names are historical: `sage` is the primary colour.
+  `canvas` #F1F5F3, the page, under a soft mint gradient · `surface` #FFFFFF for cards and sheets · `field` #F3F6F5 for inputs · `ink` #0F2A2D · `muted` #52686B · `line` #DCE5E1 · `sage` #033236, deep teal: primary buttons, selected chips, confident and confirm · `sage-soft` #DCEEE6 for chips and avatars · `brand` #21A08B, the logo teal, **for graphics only** (waveform, confirm ring), because it is 3.2:1 on white · `sky` #7FE3CB, the live lip outline · `night` #0A1A1C, the camera screen · `honey` #875A10 is "not entirely sure", a calm amber · `honey-soft` · `bar`, `bar-ink`, `bar-active`, `bar-active-ink` for the tab bar. The `coral` token exists but is unused.
+  Every text pair is at least 4.5:1 in both themes. Dark mode follows `prefers-color-scheme` (deep teal-black canvas, mint primary). The camera screen itself is always dark.
+- **Shape:** cards `rounded-card` (24 px) with `shadow-card` (soft, teal-tinted). Buttons, chips, pickers and the tab bar are full pills. Inputs are `rounded-2xl` grey fields inside a white card. Sheets are `rounded-t-[2rem]`. Tap targets are at least 44 px.
+- **Layout:** a floating pill tab bar at the bottom (Patients · Talk · Conversation; active tab is a white pill on deep teal), hidden while Talk is listening, confirming or showing a sheet or the board. Light pages use `Screen` (logo or round back button, big title, content padded above the tab bar). Talk is a full-bleed camera with a patient picker at the top, a big round Listen button and a Board button above the tab bar, and bottom sheets for results. Respect the safe areas.
 - **Motion:** use `ease-calm` and spend it on a few moments only: (1) the live lip outline over the mouth, which glows while listening; (2) the confidence bar filling; (3) the confirm ring filling with a held blink; and (4) the phrase fading in with the waveform while the voice plays. Respect `prefers-reduced-motion`.
 
 ## Cartesia (owner: B)

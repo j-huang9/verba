@@ -159,7 +159,7 @@ export function PhraseBoard({
       </header>
 
       <div className="flex items-center gap-2 px-5 py-3">
-        <div className="flex rounded-full bg-surface p-1 shadow-sm">
+        <div className="flex rounded-full bg-surface p-1 shadow-card">
           <button type="button" onClick={() => setMode('tap')} className={`rounded-full px-4 py-2 text-sm font-medium ${mode === 'tap' ? 'bg-sage text-surface' : 'text-muted'}`}>
             Tap
           </button>
@@ -208,7 +208,7 @@ export function PhraseBoard({
                   ref={lit(si, pi) ? (el) => void (litRef.current = el) : undefined}
                   type="button"
                   onClick={() => setAsking(p)}
-                  className={`flex min-h-20 flex-col justify-between rounded-2xl bg-surface p-3 text-left shadow-sm active:bg-line ${lit(si, pi) ? 'ring-4 ring-sage' : ''}`}
+                  className={`flex min-h-20 flex-col justify-between rounded-2xl bg-surface p-3 text-left shadow-card active:bg-line ${lit(si, pi) ? 'ring-4 ring-sage' : ''}`}
                 >
                   <span className="font-phrase text-xl leading-tight text-balance">{p.text}</span>
                   <span className="mt-2 flex items-center gap-1.5 text-xs text-muted">

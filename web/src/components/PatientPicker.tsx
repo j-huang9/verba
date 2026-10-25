@@ -22,7 +22,7 @@ export function PatientPicker({
 }) {
   const patients = usePatients()
   const tones = {
-    light: 'bg-surface text-ink border border-line shadow-sm',
+    light: 'bg-surface text-ink border border-line shadow-card',
     dark: 'bg-black/45 text-white backdrop-blur',
   }
   return (

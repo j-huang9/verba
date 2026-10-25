@@ -93,7 +93,7 @@ export default function Log({ id }: { id: string | null }) {
       )}
       {shared && <p className="mt-3 text-sm text-sage">{shared}</p>}
 
-      <div className="mt-4 inline-flex rounded-full bg-surface p-1 shadow-sm">
+      <div className="mt-4 inline-flex rounded-full bg-surface p-1 shadow-card">
         {tab('all', 'All')}
         {tab('urgent', 'Urgent')}
       </div>

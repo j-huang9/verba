@@ -6,7 +6,7 @@ export type Details = Pick<Patient, 'name' | 'preferredName' | 'room' | 'relatio
 const RELATIONSHIPS = ['Daughter', 'Son', 'Partner', 'Parent', 'Sibling', 'Friend', 'Other']
 
 export const input =
-  'mt-1.5 w-full rounded-2xl border border-line bg-surface px-4 py-3.5 text-lg text-ink placeholder:text-muted focus:border-sage focus:outline-none'
+  'mt-1.5 w-full rounded-2xl border border-line bg-field px-4 py-3.5 text-lg text-ink placeholder:text-muted focus:border-sage focus:bg-surface focus:outline-none'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -39,7 +39,7 @@ export function PatientFields({ value, onChange }: { value: Details; onChange: (
               type="button"
               onClick={() => set('relationship')(r === value.relationship ? '' : r)}
               aria-pressed={r === value.relationship}
-              className={`min-h-11 rounded-full border px-4 py-2.5 ${r === value.relationship ? 'border-sage bg-sage-soft text-sage' : 'border-line bg-surface text-ink'}`}
+              className={`min-h-11 rounded-full border px-4 py-2.5 ${r === value.relationship ? 'border-sage bg-sage text-surface' : 'border-line bg-field text-ink'}`}
             >
               {r}
             </button>

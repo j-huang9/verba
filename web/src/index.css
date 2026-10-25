@@ -1,30 +1,39 @@
 @import 'tailwindcss';
 
 /* Design system. Source of truth: CLAUDE.md "Design system". Use these as Tailwind
-   classes (bg-canvas, text-ink, font-phrase, text-phrase, ...), never raw hex. */
+   classes (bg-canvas, text-ink, font-phrase, shadow-card, ...), never raw hex.
+   Token names are historical: `sage` is now the deep teal primary. */
 @theme {
-  --font-phrase: 'Fraunces', Georgia, serif;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-phrase: 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Poppins', system-ui, -apple-system, sans-serif;
 
-  --color-canvas: #f6f3ec;
-  --color-surface: #ffffff;
-  --color-ink: #1e2a2f;
-  --color-muted: #6b7a80;
-  --color-line: #e9e1d3;
-  --color-sage: #5b8a72;
-  --color-sage-soft: #dce8e0;
-  --color-sky: #7fa7c9;
+  --color-canvas: #f1f5f3; /* page background, under a soft mint gradient */
+  --color-surface: #ffffff; /* cards and sheets */
+  --color-field: #f3f6f5; /* inputs and inset rows */
+  --color-ink: #0f2a2d;
+  --color-muted: #52686b;
+  --color-line: #dce5e1;
+  --color-sage: #033236; /* primary: buttons, active tab, confident, confirm */
+  --color-sage-soft: #dceee6;
+  --color-brand: #21a08b; /* the logo teal: graphics only (waveform, rings), not text */
+  --color-sky: #7fe3cb; /* the live lip outline on the camera */
+  --color-night: #0a1a1c; /* the camera screen, always dark */
+  --color-bar: #033236; /* tab bar */
+  --color-bar-ink: #ffffff;
+  --color-bar-active: #ffffff;
+  --color-bar-active-ink: #033236;
   --color-coral: #e46f5c; /* urgent: nurse view only, never on the bedside screen */
   --color-coral-soft: #fbe3de;
-  --color-honey: #a86b12; /* "not entirely sure": calm amber, never red */
-  --color-honey-soft: #f8edd8;
+  --color-honey: #875a10; /* "not entirely sure": calm amber, never red */
+  --color-honey-soft: #faeed8;
 
   --text-phrase: 6rem; /* confirmed phrase, bedside */
   --text-phrase--line-height: 1.05;
   --text-candidate: 2.75rem; /* candidate cards, bedside */
   --text-candidate--line-height: 1.15;
 
-  --radius-card: 1.75rem;
+  --radius-card: 1.5rem;
+  --shadow-card: 0 6px 24px rgb(3 50 54 / 0.07);
   --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
 
   --animate-sheet-in: sheet-in 450ms var(--ease-calm) both;
@@ -55,33 +64,61 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-canvas: #12181b;
-    --color-surface: #1b2328;
-    --color-ink: #eef2f0;
-    --color-muted: #94a3a8;
-    --color-line: #2a343a;
-    --color-sage: #7fb394;
-    --color-sage-soft: #23352c;
-    --color-sky: #9cc0de;
+    --color-canvas: #0a1c1f;
+    --color-surface: #11282c;
+    --color-field: #18343a;
+    --color-ink: #eaf3f0;
+    --color-muted: #9db4b1;
+    --color-line: #233c40;
+    --color-sage: #8edcc6;
+    --color-sage-soft: #183b36;
+    --color-brand: #3fbfa4;
+    --color-sky: #8fe8d2;
     --color-coral: #f08a78;
     --color-coral-soft: #3a2420;
-    --color-honey: #e0b15a;
+    --color-honey: #e8b964;
     --color-honey-soft: #3a2f1c;
+    --shadow-card: 0 6px 24px rgb(0 0 0 / 0.25);
+    --mint-glow: #12363a;
+    --color-bar: #12292d;
+    --color-bar-ink: #eaf3f0;
+    --color-bar-active: #8edcc6;
+    --color-bar-active-ink: #0a1c1f;
   }
 }
 :root[data-theme='dark'] {
-  --color-canvas: #12181b;
-  --color-surface: #1b2328;
-  --color-ink: #eef2f0;
-  --color-muted: #94a3a8;
-  --color-line: #2a343a;
-  --color-sage: #7fb394;
-  --color-sage-soft: #23352c;
-  --color-sky: #9cc0de;
+  --color-canvas: #0a1c1f;
+  --color-surface: #11282c;
+  --color-field: #18343a;
+  --color-ink: #eaf3f0;
+  --color-muted: #9db4b1;
+  --color-line: #233c40;
+  --color-sage: #8edcc6;
+  --color-sage-soft: #183b36;
+  --color-brand: #3fbfa4;
+  --color-sky: #8fe8d2;
   --color-coral: #f08a78;
   --color-coral-soft: #3a2420;
-  --color-honey: #e0b15a;
+  --color-honey: #e8b964;
   --color-honey-soft: #3a2f1c;
+  --shadow-card: 0 6px 24px rgb(0 0 0 / 0.25);
+  --mint-glow: #12363a;
+  --color-bar: #12292d;
+  --color-bar-ink: #eaf3f0;
+  --color-bar-active: #8edcc6;
+  --color-bar-active-ink: #0a1c1f;
+}
+
+:root {
+  --mint-glow: #d9eee4;
+}
+
+/* phrases and page titles: Poppins semibold, a touch tighter, like the reference headings */
+@layer utilities {
+  .font-phrase {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
 }
 
 html,
@@ -91,4 +128,9 @@ body,
 }
 body {
   @apply bg-canvas text-ink font-sans antialiased;
+  /* the reference's soft mint wash: one glow top-left, a fainter one bottom-right */
+  background-image:
+    radial-gradient(90% 55% at 0% 0%, var(--mint-glow) 0%, transparent 70%),
+    radial-gradient(80% 50% at 100% 100%, var(--mint-glow) 0%, transparent 65%);
+  background-attachment: fixed;
 }

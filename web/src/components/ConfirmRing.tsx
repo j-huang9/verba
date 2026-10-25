@@ -18,7 +18,7 @@ export function ConfirmRing({ progress, size = 76, children }: { progress: numbe
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - progress)}
-          className="stroke-sage transition-[stroke-dashoffset] duration-75 ease-linear"
+          className="stroke-brand transition-[stroke-dashoffset] duration-75 ease-linear"
           style={{ opacity: progress > 0 ? 1 : 0 }}
         />
       </svg>

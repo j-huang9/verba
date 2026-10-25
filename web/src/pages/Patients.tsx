@@ -1,6 +1,6 @@
 // Patients tab: the patients on this phone, or a 3-step empty state with the demo patient.
 // Each card opens the patient's page (edit details, voice, teach, delete).
-import { Avatar, btnPrimary, btnSecondary, card, Chip, Screen } from '../components/Screen'
+import { Avatar, btnPrimary, btnSecondary, card, Chip, Logo, Screen } from '../components/Screen'
 import { displayName, initials, lipsStatus, timeAgo, voiceStatus } from '../lib/format'
 import { href, navigate } from '../lib/router'
 import { setLastPatient } from '../lib/selection'
@@ -52,7 +52,7 @@ const STEPS = [
 export default function Patients() {
   const patients = usePatients()
   return (
-    <Screen>
+    <Screen logo={patients.length > 0}>
       {patients.length > 0 ? (
         <>
           <h1 className="mt-4 font-phrase text-4xl">Patients</h1>
@@ -67,7 +67,8 @@ export default function Patients() {
         </>
       ) : (
         <>
-          <h1 className="mt-4 font-phrase text-4xl leading-tight text-balance">A voice for someone who can’t speak right now</h1>
+          <Logo stacked className="mx-auto mt-4 h-28" />
+          <h1 className="mt-8 font-phrase text-4xl leading-tight text-balance">A voice for someone who can’t speak right now</h1>
           <ol className="mt-8 space-y-5">
             {STEPS.map(([title, body], i) => (
               <li key={title} className="flex gap-4">

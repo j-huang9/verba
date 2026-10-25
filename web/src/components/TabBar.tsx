@@ -39,7 +39,7 @@ export function TabBar({ active }: { active: Tab }) {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md gap-1 rounded-full bg-sage p-1.5 shadow-[0_10px_30px_rgba(3,50,54,0.25)]"
+      className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md gap-1 rounded-full border border-white/10 bg-bar p-1.5 shadow-[0_10px_30px_rgb(3_50_54/0.25)]"
     >
       {TABS.map(({ tab, label, to }) => {
         const on = tab === active
@@ -49,7 +49,7 @@ export function TabBar({ active }: { active: Tab }) {
             href={href(to)}
             aria-current={on ? 'page' : undefined}
             className={`flex min-h-13 flex-1 items-center justify-center gap-2 rounded-full px-2 text-sm font-medium transition-colors duration-200 ease-calm ${
-              on ? 'bg-surface text-sage' : 'text-surface/75 active:bg-surface/10'
+              on ? 'bg-bar-active text-bar-active-ink' : 'text-bar-ink/80 active:bg-white/10'
             }`}
           >
             <svg viewBox="0 0 24 24" className="size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

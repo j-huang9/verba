@@ -1,7 +1,7 @@
 // Add a patient: 1. details  2. their voice (A's VoiceSetup)  3. teach it their lips now or later.
 import { useState } from 'react'
 import { PatientFields, type Details } from '../components/PatientFields'
-import { btnPrimary, btnSecondary, Screen } from '../components/Screen'
+import { btnPrimary, btnSecondary, card, Screen } from '../components/Screen'
 import { VoiceSetup } from '../components/VoiceSetup'
 import { navigate } from '../lib/router'
 import { setLastPatient } from '../lib/selection'
@@ -28,7 +28,9 @@ function DetailsStep({ onCreated }: { onCreated: (id: string) => void }) {
 
   return (
     <form onSubmit={submit} className="mt-6 space-y-6">
-      <PatientFields value={d} onChange={setD} />
+      <div className={`${card} p-5`}>
+        <PatientFields value={d} onChange={setD} />
+      </div>
       <button type="submit" disabled={!d.name.trim()} className={btnPrimary}>
         Continue
       </button>

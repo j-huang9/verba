@@ -6,6 +6,7 @@ export function Screen({
   title,
   back,
   action,
+  logo = true,
   children,
 }: {
   title?: React.ReactNode
@@ -13,6 +14,8 @@ export function Screen({
   back?: string
   /** small element on the right of the header */
   action?: React.ReactNode
+  /** show the logo in the header when there's no back button */
+  logo?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -20,13 +23,15 @@ export function Screen({
       <div className="mx-auto max-w-xl px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <header className="flex min-h-11 items-center justify-between gap-3">
           {back !== undefined ? (
-            <a href={href(back)} aria-label="Back" className="-ml-2 grid size-11 place-items-center rounded-full active:bg-line">
+            <a href={href(back)} aria-label="Back" className="grid size-11 place-items-center rounded-full border border-line bg-surface shadow-card active:bg-field">
               <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M15 5l-7 7 7 7" />
               </svg>
             </a>
+          ) : logo ? (
+            <Logo className="h-7" />
           ) : (
-            <p className="font-phrase text-xl">Verba</p>
+            <span />
           )}
           {action}
         </header>
@@ -40,8 +45,19 @@ export function Screen({
 export const btnPrimary =
   'w-full rounded-full bg-sage py-4 text-lg font-medium text-surface active:opacity-90 disabled:opacity-40'
 export const btnSecondary =
-  'w-full rounded-full border border-line bg-surface py-3.5 text-lg font-medium text-ink active:bg-line'
-export const card = 'rounded-card bg-surface shadow-sm'
+  'w-full rounded-full border border-line bg-surface py-3.5 text-lg font-medium text-ink shadow-card active:bg-field'
+export const card = 'rounded-card bg-surface shadow-card'
+
+/** the Verba logo PNG (web/public/brand), with a light-text version in dark mode */
+export function Logo({ stacked = false, className = '' }: { stacked?: boolean; className?: string }) {
+  const name = stacked ? 'logo' : 'logo-horizontal'
+  return (
+    <picture>
+      <source srcSet={`/brand/${name}-dark.png`} media="(prefers-color-scheme: dark)" />
+      <img src={`/brand/${name}.png`} alt="Verba" className={`w-auto ${className}`} />
+    </picture>
+  )
+}
 
 export function Chip({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'sage' | 'honey' }) {
   const tones = { muted: 'bg-canvas text-muted', sage: 'bg-sage-soft text-sage', honey: 'bg-honey-soft text-honey' }

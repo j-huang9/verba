@@ -204,7 +204,7 @@ function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; 
   const showControls = !board && !showing && (lr.phase === 'ready' || lr.phase === 'listening' || lr.phase === 'loading' || lr.phase === 'error')
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-[#0d1214] text-white" onPointerDownCapture={unlockOnce}>
+    <main className="relative h-dvh overflow-hidden bg-night text-white" onPointerDownCapture={unlockOnce}>
       <CameraView
         videoRef={lr.videoRef}
         faceRef={lr.faceRef}
@@ -220,7 +220,7 @@ function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; 
           <PatientPicker value={patient.id} onChange={(pid) => pid && navigate(`/p/${pid}/talk`, { replace: true })} tone="dark" />
           <div className="mt-2 flex flex-wrap gap-2">
             {patient.calibration?.personal && (
-              <p className="inline-flex rounded-full bg-sage/80 px-3 py-1.5 text-sm text-white backdrop-blur">Calibrated for {name}</p>
+              <p className="inline-flex rounded-full bg-black/45 px-3 py-1.5 text-sm text-sky backdrop-blur">✓ Calibrated for {name}</p>
             )}
             {status && <p className="inline-flex rounded-full bg-black/40 px-3 py-1.5 text-sm text-white/85 backdrop-blur">{status}</p>}
           </div>

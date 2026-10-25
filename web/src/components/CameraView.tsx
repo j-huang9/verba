@@ -94,9 +94,9 @@ export function CameraView({
   }, [faceRef, videoRef, mirrored])
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-[#0d1214]">
+    <div className="absolute inset-0 overflow-hidden bg-night">
       {mock ? (
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,#3b4a50_0%,#141b1e_70%)]" />
+        <div className="absolute inset-0 bg-night bg-[radial-gradient(ellipse_at_50%_45%,rgb(127_227_203/0.14)_0%,transparent_70%)]" />
       ) : (
         <video
           ref={videoRef}

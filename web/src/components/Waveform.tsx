@@ -65,5 +65,5 @@ export function Waveform({
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  return <canvas ref={canvasRef} aria-hidden className={`text-sage ${className}`} />
+  return <canvas ref={canvasRef} aria-hidden className={`text-brand ${className}`} />
 }
