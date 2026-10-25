@@ -1,4 +1,4 @@
-# Verba: demo video script (about 2:00, opens with our 15-second intro)
+# Verba: demo video script (about 2:10, opens with our 15-second intro)
 
 For the submitted video only. The live judging demo has its own setup.
 **Style:** a straightforward walkthrough. It's mostly a screen recording of the phone, with a picture-in-picture of the patient's face whenever the camera matters, and a plain voice-over (VO) that says what each step does. There's no cinematic intro and no music bed (or keep it very quiet).
@@ -9,8 +9,8 @@ For the submitted video only. The live judging demo has its own setup.
 | 0:00 | Intro (already recorded) | 15 s |
 | 0:15 | Introducing Verba | 12 s |
 | 0:27 | Walkthrough: 7 steps | 75 s |
-| 1:42 | How it works + results | 15 s |
-| 1:57 | Close | 5 s |
+| 1:42 | How it works | 25 s |
+| 2:07 | Close | 5 s |
 
 ---
 
@@ -99,24 +99,33 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 
 **VO:** "Any message can be undone, and everything is logged with how it was confirmed, so it can be shared with the nurse."
 
-## 1:42 How it works + results (15 s)
+## 1:42 How it works (25 s)
 
-**Slide: pipeline diagram**
-```
-phone camera → MediaPipe face mesh → 40 lip points → 3,840 motion features
-→ neural net (exported from Python, runs in the browser)
-→ calibrated confidence → speak (≥ 70%) or confirm by blink
-```
-**Slide: results**, measured only on people the model never saw (leave-one-person-out, 8 phrases):
+**Slide: pipeline diagram**, built left to right. Highlight each box as the VO reaches it. Under each box, show one plain-English line in small text:
 
-| | Right phrase in top 3 |
-|---|---|
-| Shared model | 81% |
-| After teaching it their lips | 87% |
+| # | Box | Small text under it | VO lines it up with |
+|---|---|---|---|
+| 1 | **Phone camera → MediaPipe face tracking** | Finds the face in every video frame | "MediaPipe tracks the face in every frame…" |
+| 2 | **40 lip points** | Plus eyes, nose and chin as anchors, so head position and tilt don't matter | "…we keep 40 points around the lips, adjusted for head position and tilt." |
+| 3 | **3,840 motion numbers** | The lip shapes and how fast they change, over the whole phrase | "That motion becomes 3,840 numbers…" |
+| 4 | **Neural net, trained by us** | Scores each phrase. Trained in Python, runs in the phone's browser | "…and a small neural net we trained scores each phrase." |
+| 5 | **Calibrated confidence** | "70% sure" is right about 70% of the time | "Its confidence is calibrated…" |
+| 6 | **≥ 70% → speak · below → ask for a blink** | Blinks come from the same face tracking | (on screen only) |
 
-**VO:** "Everything runs on the phone, and no video leaves the device. On people the model has never seen, the right phrase is in the top 3 81% of the time, and 87% after teaching it their lips."
+Below the diagram, in a band: **Everything runs on the phone. No video leaves it.** And small: *Voice: Cartesia clone + Sonic 3.6, saved on the phone.*
 
-## 1:57 Close (5 s)
+**VO:** "Under the hood: MediaPipe tracks the face in every frame, and we keep 40 points around the lips, adjusted for head position and tilt. That motion becomes 3,840 numbers, and a small neural net we trained scores each phrase. Its confidence is calibrated, so 70% sure means right about 70% of the time. Everything runs on the phone. No video ever leaves it."
+
+*(The 81% → 87% results were already shown in step 3, so there's no separate results slide. If you need to cut time, drop box 6; it repeats steps 4–5.)*
+
+**If a judge asks for more detail** (for the Devpost, not the VO):
+- MediaPipe Face Landmarker finds 478 face points per frame. We keep the 40 lip points plus 4 anchors (outer eye corners, nose tip, chin).
+- The lips are re-centered on the nose, rotated so the eyes are level, and scaled by the distance between the eyes. That removes head position, tilt and distance from the camera.
+- Each take is resampled to 24 frames. The features are lip shape over time, velocity, and the average shape: 3,840 numbers in all.
+- The neural net has one hidden layer of 128 units. It was trained in Python, exported to JSON, and runs in TypeScript on the phone. A test checks that the phone version matches Python to about 1e-15.
+- Confidence is calibrated with temperature scaling, fitted on people the model didn't train on.
+
+## 2:07 Close (5 s)
 
 **Slide:** **Verba**, *Their words, in their own voice.* Below it: team names · Cal Hacks 2026 · GitHub link.
 **VO:** "Verba. Their words, in their own voice."
@@ -156,7 +165,7 @@ phone camera → MediaPipe face mesh → 40 lip points → 3,840 motion features
 - [ ] 5 · "I'm scared", below 70% → blink-hold → voice
 - [ ] 6 · Wrong read → None of these → Likely → tap; blink scan → "When does the tube come out?"
 - [ ] 7 · Undo → Conversation → Share
-- [ ] Pipeline + results slides
+- [ ] Pipeline slide (6 boxes, highlighted in sync with the VO)
 - [ ] End slide
 
 ## Sources for the stats
