@@ -1,4 +1,4 @@
-# Verba: demo video script (about 2:00)
+# Verba: demo video script (about 2:00, opens with our 15-second intro)
 
 For the submitted video only. The live judging demo has its own setup.
 **Style:** a straightforward walkthrough. It's mostly a screen recording of the phone, with a picture-in-picture of the patient's face whenever the camera matters, and a plain voice-over (VO) that says what each step does. There's no cinematic intro and no music bed (or keep it very quiet).
@@ -6,39 +6,36 @@ For the submitted video only. The live judging demo has its own setup.
 
 | Time | Section | Length |
 |---|---|---|
-| 0:00 | Title + problem (stats) | 20 s |
-| 0:20 | What Verba is | 7 s |
+| 0:00 | Intro (already recorded) | 15 s |
+| 0:15 | Introducing Verba | 12 s |
 | 0:27 | Walkthrough: 7 steps | 75 s |
 | 1:42 | How it works + results | 15 s |
 | 1:57 | Close | 5 s |
 
 ---
 
-## 0:00 Title + problem (20 s)
+## 0:00 Intro (15 s, already recorded)
 
-**Slide 1 (3 s):** **Verba**, with the line *Lip reading + voice cloning for ICU patients on breathing tubes.*
+**VO (as recorded):** "Imagine being awake in the ICU with your family beside you, and not being able to say a word. In one study, more than 8 in 10 patients on breathing tubes struggled just to be understood. They're cut off from the people they love, right when they need them most."
 
-**Slide 2 (17 s):** the stats appear one at a time.
-- **~800,000** U.S. adults are put on a ventilator each year.¹
-- **54%** of ventilated patients are awake and responsive enough to communicate.²
-- Being unable to speak is the **strongest predictor of distress** in these patients.³
-- Today's tools: letter boards, pen and paper, guessing. They depend on hand strength and attention the patient often doesn't have.
+**On screen during the "8 in 10" line:** **82%** of ventilated patients rated communication as "extremely hard". Small text: *Thapa et al., Birat J Health Sci 2019 (n = 48)*
+*(The study's wording is "rated communication as extremely hard". "Struggled to be understood" is a fair paraphrase. To match it exactly, say "found it extremely hard just to communicate".)*
 
-**VO:** "About 800,000 adults in the U.S. go on a ventilator every year. More than half of them are awake and able to communicate, but the breathing tube means they can't make a sound. And not being able to speak is the strongest predictor of distress for these patients. Today they're left with letter boards and guessing."
+## 0:15 Introducing Verba (12 s)
 
-Small text on screen:
-1. Wunsch et al., *Crit Care Med* 2010
-2. Happ et al., *Heart & Lung* 2015 (n = 2,671)
-3. Khalaila et al., *Am J Crit Care* 2011
+**Transition:** cut from the last intro shot to the phone, with the Verba home screen filling the frame.
 
-## 0:20 What Verba is (7 s)
+**On screen, one at a time:**
+1. **~800,000** U.S. adults go on a ventilator each year. *(Wunsch et al., Crit Care Med 2010)*
+2. **Over half** are awake enough to communicate. *(Happ et al., Heart & Lung 2015)*
+3. **Verba**: *Their words, in their own voice.*
 
-**Screen:** the Verba home screen.
-**VO:** "Verba is a phone app. It reads the patient's lips, and says what they mean in their own voice. Here's the full flow."
+**VO:** "Every year, about 800,000 adults in the U.S. go on a ventilator, and more than half are awake enough to communicate. Verba gives them a way. It's a phone app that reads their lips and speaks for them, in their own voice. Here's how it works."
 
 ## 0:27 Walkthrough (75 s)
 
 Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
+*(If Claire's tab bar has landed, steps 1–3 happen on the **Patients** tab, steps 4–6 on **Talk**, and step 7 on **Conversation**. Briefly show the tab being tapped, so viewers see the app's layout.)*
 
 **1 · Add a patient (8 s)**
 **Screen:** tap **Add a patient**, enter the name, "ICU, bed 4", pick **Daughter**, then tap Next.
@@ -143,8 +140,8 @@ phone camera → MediaPipe face mesh → 40 lip points → 3,840 motion features
 7. **If Teach's held-out result is weak** on film day, show it anyway or cut the result card. Never edit the numbers.
 
 ## Shot checklist
-- [ ] Title + stats slides
-- [ ] Home screen
+- [ ] Intro (done) + "82%" caption
+- [ ] Bridge: home screen + 800k / over-half captions + Verba title
 - [ ] 1 · Add patient
 - [ ] 2 · Upload → consent → creating → sample → phrases saving
 - [ ] 3 · Teach grid (+ picture-in-picture) → result card
@@ -156,6 +153,7 @@ phone camera → MediaPipe face mesh → 40 lip points → 3,840 motion features
 - [ ] End slide
 
 ## Sources for the stats
+0. Thapa D, Dahal A, Singh R. *Communication difficulties and psychological stress in patients receiving mechanical ventilation.* Birat J Health Sci. 2019;4(2). (82.29% of 48 patients rated general communication as extremely hard; https://www.nepjol.info/index.php/bjhs/article/view/25452)
 1. Wunsch H, et al. *The epidemiology of mechanical ventilation use in the United States.* Crit Care Med. 2010;38:1947–53. (About 800,000 adults a year; cited in West J Emerg Med 2015, https://pmc.ncbi.nlm.nih.gov/articles/PMC4644038)
 2. Happ MB, et al. *The number of mechanically ventilated ICU patients meeting communication criteria.* Heart & Lung. 2015. (53.9% of 2,671 patients; https://news.osu.edu/more-than-half-of-icu-patients-on-ventilators-have-the-ability-to-communicate/)
 3. Khalaila R, et al. *Communication difficulties and psychoemotional distress in patients receiving mechanical ventilation.* Am J Crit Care. 2011;20(6):470–9. (Inability to speak was the strongest predictor of psychoemotional distress; n = 65.)
