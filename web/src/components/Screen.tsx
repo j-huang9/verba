@@ -1,4 +1,5 @@
-// The light page shell (Home, New patient, Patient, Log, Voice). Camera screens stay dark.
+// The light page shell (Patients, New patient, Patient, Conversation, Voice). Camera screens
+// stay dark. The bottom padding keeps content clear of the floating tab bar.
 import { href } from '../lib/router'
 
 export function Screen({
@@ -16,7 +17,7 @@ export function Screen({
 }) {
   return (
     <main className="min-h-dvh bg-canvas text-ink">
-      <div className="mx-auto max-w-xl px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-xl px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <header className="flex min-h-11 items-center justify-between gap-3">
           {back !== undefined ? (
             <a href={href(back)} aria-label="Back" className="-ml-2 grid size-11 place-items-center rounded-full active:bg-line">

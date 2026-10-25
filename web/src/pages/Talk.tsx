@@ -7,14 +7,17 @@ import { CameraView } from '../components/CameraView'
 import { DebugOverlay } from '../components/DebugOverlay'
 import { PhraseBoard, type BoardPick } from '../components/PhraseBoard'
 import { ConfirmSheet, MessageSheet } from '../components/ResultSheets'
-import { Screen } from '../components/Screen'
+import { PatientPicker } from '../components/PatientPicker'
+import { btnPrimary, Screen } from '../components/Screen'
 import type { Guess, Message } from '../engine/types'
 import { useLipReader } from '../engine/useLipReader'
 import { displayName } from '../lib/format'
 import { PHRASES } from '../lib/phrases'
-import { href } from '../lib/router'
+import { href, navigate } from '../lib/router'
+import { setLastPatient, useLastPatient } from '../lib/selection'
+import { TAB_SPACE, useHideTabBar } from '../lib/tabBar'
 import { unlockAudio, useSpeaker } from '../lib/speaker'
-import { addEntry, getPatient, updateEntry, useLog, usePatient, type Patient } from '../lib/store'
+import { addEntry, getPatient, updateEntry, useLog, usePatients, type Patient } from '../lib/store'
 import { usePrefersReducedMotion } from '../lib/usePrefersReducedMotion'
 import { voiceUrl } from '../lib/voice'
 
@@ -38,16 +41,31 @@ interface BoardState {
   rejected: string[]
 }
 
-export default function Talk({ id, board }: { id: string; board: boolean }) {
-  const patient = usePatient(id)
+/** Talk tab. `id` null = the last patient you were with (or the first one). */
+export default function Talk({ id, board }: { id: string | null; board: boolean }) {
+  const patients = usePatients()
+  const last = useLastPatient()
+  const patient =
+    patients.find((p) => p.id === id) ?? (id === null ? (patients.find((p) => p.id === last) ?? patients[0]) : undefined)
+
+  useEffect(() => {
+    if (patient) setLastPatient(patient.id)
+  }, [patient])
+
   if (!patient) {
     return (
-      <Screen back="/" title="Patient not found">
-        <p className="mt-3 text-muted">They may have been removed from this phone.</p>
+      <Screen title={id === null ? 'Who are you with?' : 'Patient not found'}>
+        <p className="mt-3 text-lg text-muted">
+          {id === null ? 'Add the person you’re with, then point the phone at them to talk.' : 'They may have been deleted from this phone.'}
+        </p>
+        <a href={href('/new')} className={`${btnPrimary} mt-8 block text-center`}>
+          Add a patient
+        </a>
       </Screen>
     )
   }
-  return <TalkScreen patient={patient} openBoard={board} />
+  // a new patient remounts the camera and lip reader with their calibration
+  return <TalkScreen key={patient.id} patient={patient} openBoard={board} />
 }
 
 function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; openBoard: boolean }) {
@@ -180,6 +198,9 @@ function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; 
           ? 'Point the camera at their face'
           : null
 
+  // the tab bar would cover the Listen button while capturing, and the sheets and board
+  useHideTabBar(!!board || !!showing || lr.phase === 'listening' || lr.phase === 'confirming')
+
   const showControls = !board && !showing && (lr.phase === 'ready' || lr.phase === 'listening' || lr.phase === 'loading' || lr.phase === 'error')
 
   return (
@@ -195,13 +216,8 @@ function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; 
       {debug && <DebugOverlay read={lr.readDebug} voice={speaker.speaking ? `${speaker.status} ▶` : speaker.status} />}
 
       <header className="absolute inset-x-0 top-0 flex items-start gap-3 bg-gradient-to-b from-black/50 to-transparent px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-10">
-        <a href={href(`/p/${patient.id}`)} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-black/40 backdrop-blur active:bg-black/60">
-          <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-        </a>
-        <div className="min-w-0 flex-1 pt-1.5">
-          <p className="truncate font-phrase text-xl">{name}</p>
+        <div className="min-w-0 flex-1">
+          <PatientPicker value={patient.id} onChange={(pid) => pid && navigate(`/p/${pid}/talk`, { replace: true })} tone="dark" />
           <div className="mt-2 flex flex-wrap gap-2">
             {patient.calibration?.personal && (
               <p className="inline-flex rounded-full bg-sage/80 px-3 py-1.5 text-sm text-white backdrop-blur">Calibrated for {name}</p>
@@ -225,7 +241,10 @@ function TalkScreen({ patient, openBoard: startWithBoard }: { patient: Patient; 
       </header>
 
       {showControls && (
-        <footer className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 bg-gradient-to-t from-black/60 to-transparent px-6 pt-16 pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <footer
+          className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 bg-gradient-to-t from-black/60 to-transparent px-6 pt-16"
+          style={{ paddingBottom: TAB_SPACE }}
+        >
           <p className="text-center text-lg text-white/90" aria-live="polite">
             {toast ??
               lr.notice ??

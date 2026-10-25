@@ -1,34 +1,41 @@
-// The conversation log: everything they said, grouped by day. Undone messages stay, struck
-// through; corrected ones say what they replaced. Share sends a text summary to the nurse.
+// Conversation tab: everything they said, grouped by day, for one patient or all of them.
+// Undone messages stay, struck through; corrected ones say what they replaced.
+// Share sends a text summary to the nurse.
 import { useState } from 'react'
+import { PatientPicker } from '../components/PatientPicker'
 import { card, Screen } from '../components/Screen'
 import { clock, dayLabel, displayName, entryMeta } from '../lib/format'
 import { PHRASE_BY_ID } from '../lib/phrases'
+import { navigate } from '../lib/router'
 import { unlockAudio, useSpeaker } from '../lib/speaker'
-import { getPatient, useLog, usePatient, type LogEntry, type Patient } from '../lib/store'
+import { getPatient, useAllLog, usePatients, type LogEntry, type Patient } from '../lib/store'
 import { voiceUrl } from '../lib/voice'
 
-function summary(p: Patient, entries: LogEntry[]) {
-  const lines = entries
-    .filter((e) => !e.undone)
-    .map((e) => `${dayLabel(e.at)} ${clock(e.at)}  "${e.text}"  (${entryMeta(e)})`)
-  return [`What ${displayName(p)} said${p.room ? ` (${p.room})` : ''}, from Verba:`, '', ...lines].join('\n')
+function summary(patients: Patient[], entries: LogEntry[]) {
+  const out: string[] = []
+  for (const p of patients) {
+    const lines = entries
+      .filter((e) => e.patientId === p.id && !e.undone)
+      .map((e) => `${dayLabel(e.at)} ${clock(e.at)}  "${e.text}"  (${entryMeta(e)})`)
+    if (!lines.length) continue
+    if (out.length) out.push('')
+    out.push(`What ${displayName(p)} said${p.room ? ` (${p.room})` : ''}, from Verba:`, '', ...lines)
+  }
+  return out.join('\n')
 }
 
-export default function Log({ id }: { id: string }) {
-  const p = usePatient(id)
-  const log = useLog(id)
+/** `id` null = all patients */
+export default function Log({ id }: { id: string | null }) {
+  const patients = usePatients()
+  const all = useAllLog()
   const speaker = useSpeaker()
   const [filter, setFilter] = useState<'all' | 'urgent'>('all')
   const [shared, setShared] = useState<string | null>(null)
 
-  if (!p) {
-    return (
-      <Screen back="/" title="Patient not found">
-        <p className="mt-3 text-muted">They may have been removed from this phone.</p>
-      </Screen>
-    )
-  }
+  const patient = id ? (patients.find((p) => p.id === id) ?? null) : null
+  const shown = id ? (patient ? [patient] : []) : patients
+  const byId = new Map(patients.map((p) => [p.id, p]))
+  const log = all.filter((e) => byId.has(e.patientId) && (!id || e.patientId === id))
 
   const entries = [...log].sort((a, b) => b.at - a.at).filter((e) => filter === 'all' || PHRASE_BY_ID[e.phraseId]?.urgent)
   const days: [string, LogEntry[]][] = []
@@ -40,14 +47,14 @@ export default function Log({ id }: { id: string }) {
 
   const replay = async (e: LogEntry) => {
     unlockAudio() // inside the tap, so iOS plays it after the voice URL resolves
-    const patient = getPatient(id)
-    speaker.speak(e.phraseId, e.text, patient ? await voiceUrl(patient, e.phraseId) : null)
+    const p = getPatient(e.patientId)
+    speaker.speak(e.phraseId, e.text, p ? await voiceUrl(p, e.phraseId) : null)
   }
 
   const share = async () => {
-    const text = summary(p, [...log])
+    const text = summary(shown, log)
     try {
-      if (navigator.share) await navigator.share({ title: `${displayName(p)}: conversation`, text })
+      if (navigator.share) await navigator.share({ title: patient ? `${displayName(patient)}: conversation` : 'Verba: conversations', text })
       else {
         await navigator.clipboard.writeText(text)
         setShared('Copied. Paste it in a message to the nurse.')
@@ -62,7 +69,7 @@ export default function Log({ id }: { id: string }) {
       type="button"
       onClick={() => setFilter(f)}
       aria-pressed={filter === f}
-      className={`rounded-full px-4 py-2 text-sm font-medium ${filter === f ? 'bg-sage text-surface' : 'text-muted'}`}
+      className={`min-h-11 rounded-full px-5 text-sm font-medium ${filter === f ? 'bg-sage text-surface' : 'text-muted'}`}
     >
       {label}
     </button>
@@ -70,26 +77,31 @@ export default function Log({ id }: { id: string }) {
 
   return (
     <Screen
-      back={`/p/${id}`}
       title="Conversation"
       action={
         log.some((e) => !e.undone) && (
-          <button type="button" onClick={share} className="rounded-full border border-line bg-surface px-4 py-2 font-medium active:bg-line">
+          <button type="button" onClick={share} className="min-h-11 rounded-full border border-line bg-surface px-5 font-medium active:bg-line">
             Share
           </button>
         )
       }
     >
-      <p className="mt-1 text-muted">Everything {displayName(p)} said on this phone.</p>
+      {patients.length > 0 && (
+        <div className="mt-4">
+          <PatientPicker value={id} allOption onChange={(pid) => navigate(pid ? `/p/${pid}/log` : '/log', { replace: true })} />
+        </div>
+      )}
       {shared && <p className="mt-3 text-sm text-sage">{shared}</p>}
 
-      <div className="mt-5 inline-flex rounded-full bg-surface p-1 shadow-sm">
+      <div className="mt-4 inline-flex rounded-full bg-surface p-1 shadow-sm">
         {tab('all', 'All')}
         {tab('urgent', 'Urgent')}
       </div>
 
       {days.length === 0 && (
-        <p className="mt-10 text-center text-muted">{filter === 'urgent' ? 'Nothing urgent yet.' : 'Nothing said yet. Start talking from their page.'}</p>
+        <p className="mt-10 text-center text-muted">
+          {filter === 'urgent' ? 'Nothing urgent yet.' : 'Nothing said yet. Messages appear here as they’re spoken.'}
+        </p>
       )}
 
       {days.map(([day, list]) => (
@@ -101,6 +113,7 @@ export default function Log({ id }: { id: string }) {
                 <div className="min-w-0 flex-1">
                   <p className={`font-phrase text-2xl leading-tight ${e.undone ? 'text-muted line-through' : ''}`}>{e.text}</p>
                   <p className="mt-1 text-sm text-muted">
+                    {!id && `${displayName(byId.get(e.patientId)!)} · `}
                     {clock(e.at)} · {entryMeta(e)}
                     {e.undone && ' · Undone'}
                   </p>

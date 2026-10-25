@@ -1,7 +1,9 @@
-// Home: the patients on this phone, or a 3-step empty state with the demo patient.
+// Patients tab: the patients on this phone, or a 3-step empty state with the demo patient.
+// Each card opens the patient's page (edit details, voice, teach, delete).
 import { Avatar, btnPrimary, btnSecondary, card, Chip, Screen } from '../components/Screen'
 import { displayName, initials, lipsStatus, timeAgo, voiceStatus } from '../lib/format'
 import { href, navigate } from '../lib/router'
+import { setLastPatient } from '../lib/selection'
 import { addPatient, useLog, usePatients, type Patient } from '../lib/store'
 
 function tryDemo() {
@@ -14,7 +16,8 @@ function tryDemo() {
     voice: { kind: 'demo' },
     calibration: null,
   })
-  navigate(`/p/${p.id}`)
+  setLastPatient(p.id)
+  navigate(`/p/${p.id}/talk`)
 }
 
 function PatientCard({ p }: { p: Patient }) {
@@ -46,13 +49,13 @@ const STEPS = [
   ['Talk', 'Point the phone at them, tap Listen, and they mouth what they want to say.'],
 ]
 
-export default function Home() {
+export default function Patients() {
   const patients = usePatients()
   return (
     <Screen>
       {patients.length > 0 ? (
         <>
-          <h1 className="mt-4 font-phrase text-4xl">Who are you with?</h1>
+          <h1 className="mt-4 font-phrase text-4xl">Patients</h1>
           <div className="mt-6 space-y-3">
             {patients.map((p) => (
               <PatientCard key={p.id} p={p} />

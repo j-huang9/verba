@@ -133,6 +133,7 @@ export function updateEntry(id: string, patch: Partial<LogEntry>) {
 
 /** non-hook read, for code outside React (e.g. the voice bank builder) */
 export const getPatient = (id: string) => state.patients.find((p) => p.id === id) ?? null
+export const getPatients = () => state.patients
 
 // ---- hooks ----
 
@@ -148,4 +149,9 @@ export function usePatient(id: string): Patient | null {
 export function useLog(patientId: string): LogEntry[] {
   const log = useSyncExternalStore(subscribe, () => state.log)
   return log.filter((e) => e.patientId === patientId)
+}
+
+/** every patient's log, oldest first (the Conversation tab's "All patients") */
+export function useAllLog(): LogEntry[] {
+  return useSyncExternalStore(subscribe, () => state.log)
 }
