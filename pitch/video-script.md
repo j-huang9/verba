@@ -57,12 +57,12 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 1. **(6 s, sped up 6×)** The Teach screen: **"Ask them to mouth: 'I'm thirsty'"**, with the grid filling hands-free. Picture-in-picture: the patient mouthing. A small timer counts up to about 2:00.
 2. **(5 s, normal speed)** The result card: **"On takes it didn't learn from, first guess right"**, before → after.
 3. **(6 s)** A simple graphic: two bars side by side.
-   - **Speaks right away without asking: 12% → 33% of the time**
+   - **Sure enough to speak without asking for a blink: 12% → 33% of readings**
    - **Right phrase in the top 3: 81% → 87%**
 
    Small text: *measured on people the model never saw · all 4 test subjects improved*
 
-**VO:** "Everyone's lips move differently, so once, the family spends two minutes teaching Verba. The patient mouths each phrase three times, and Verba fine-tunes itself right on the phone. Afterward, it can speak right away nearly three times as often, instead of stopping to ask."
+**VO:** "Out of the box, Verba's model has only seen other people's lips, so with a new patient it's often unsure. So the patient mouths each phrase three times, and Verba retrains part of its model on those examples, right on the phone. Then it's sure enough to speak without asking 33% of the time, up from 12%."
 **Caption:** *One-time · about 2 minutes · runs on the phone, nothing uploaded*
 
 *(Why this beat matters: the capture looks repetitive, so the VO answers "why bother" before viewers ask. It's done once per patient, and it makes every later conversation faster: fewer "Did you mean…?" pauses.)*
