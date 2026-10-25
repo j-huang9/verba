@@ -37,11 +37,11 @@ For the submitted video only. The live judging demo has its own setup.
 Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 *(If Claire's tab bar has landed, steps 1–3 happen on the **Patients** tab, steps 4–6 on **Talk**, and step 7 on **Conversation**. Briefly show the tab being tapped, so viewers see the app's layout.)*
 
-**1 · Add a patient (8 s)**
+**1 · Add a patient (6 s)**
 **Screen:** tap **Add a patient**, enter the name, "ICU, bed 4", pick **Daughter**, then tap Next.
 **VO:** "A family member adds the patient: name, room, and who they are to them."
 
-**2 · Clone their voice (14 s)**
+**2 · Clone their voice (13 s)**
 **Screen:**
 1. Tap **Upload a video or voice memo** and pick a clip.
 2. Check the consent box.
@@ -52,13 +52,20 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 **VO:** "Next, we upload any old video of them talking. Cartesia clones the voice in a few seconds, and Verba generates 50 common phrases in that voice and saves them on the phone, so speaking works offline."
 **Caption:** *Cartesia Instant Voice Clone + Sonic 3.6 text-to-speech*
 
-**3 · Teach it their lips (11 s, sped up)**
+**3 · Teach it their lips (17 s; the capture is sped up, the "why" is not)**
 **Screen:**
-1. The Teach screen: **"Ask them to mouth: 'I'm thirsty'"**, with the grid filling, plus a picture-in-picture of the patient mouthing.
-2. Return to normal speed on the result card ("On takes it didn't learn from, first guess right: before → after").
+1. **(6 s, sped up 6×)** The Teach screen: **"Ask them to mouth: 'I'm thirsty'"**, with the grid filling hands-free. Picture-in-picture: the patient mouthing. A small timer counts up to about 2:00.
+2. **(5 s, normal speed)** The result card: **"On takes it didn't learn from, first guess right"**, before → after.
+3. **(6 s)** A simple graphic: two bars side by side.
+   - **Speaks right away without asking: 12% → 33% of the time**
+   - **Right phrase in the top 3: 81% → 87%**
 
-**VO:** "Then the patient mouths 8 phrases, 3 times each. Verba fine-tunes the model to their lips on the phone, then tests itself on takes it didn't train on."
-**Caption:** *Fine-tuned on the phone in under a second*
+   Small text: *measured on people the model never saw*
+
+**VO:** "Everyone's lips move differently, especially with a tube in their mouth, so a one-size-fits-all model is often unsure. So, once, the family spends about two minutes on this. The patient mouths each phrase three times, hands-free, and Verba fine-tunes itself to their lips right on the phone. In our tests, every person we tried improved, and Verba could speak right away nearly three times as often, instead of stopping to ask. Two minutes once, for every conversation after."
+**Caption:** *One-time · about 2 minutes · runs on the phone, nothing uploaded*
+
+*(Why this beat matters: the capture looks repetitive, so the VO answers "why bother" before viewers ask. It's done once per patient, and it makes every later conversation faster: fewer "Did you mean…?" pauses.)*
 
 **4 · Lip reading: confident (10 s)**
 **Screen:**
@@ -68,7 +75,7 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 
 **VO:** "Now we tap Listen and they mouth 'I'm thirsty'. Verba is confident, so it speaks it in their voice."
 
-**5 · Lip reading: not sure → blink to confirm (12 s)**
+**5 · Lip reading: not sure → blink to confirm (11 s)**
 **Screen:**
 1. The patient mouths **"I'm scared."**
 2. The bar fills amber: **"Not entirely sure"**, with the top 3 guesses.
@@ -76,7 +83,7 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 
 **VO:** "When it's below 70%, it doesn't speak. It shows its top guesses, and the patient confirms by holding their eyes closed. Two blinks would move to the next guess."
 
-**6 · Phrase board (13 s)**
+**6 · Phrase board (12 s)**
 **Screen:**
 1. A wrong read: tap **"None of these → phrase board"**.
 2. Highlight **"Likely from their lips"**, with the right phrase at the top. Tap it.
@@ -84,7 +91,7 @@ Show a step label in the corner for each step, e.g. **"1 · Add a patient"**.
 
 **VO:** "If every guess is wrong, the phrase board opens with the model's next-best guesses at the top. It also covers all 50 phrases, and the patient can scan through them hands-free with long blinks."
 
-**7 · Undo + conversation log (7 s)**
+**7 · Undo + conversation log (6 s)**
 **Screen:**
 1. Tap **Undo** on a message ("Undone").
 2. Open **Conversation**: each entry shows how it was confirmed, and the undone one is crossed out.
@@ -144,7 +151,7 @@ phone camera → MediaPipe face mesh → 40 lip points → 3,840 motion features
 - [ ] Bridge: home screen + 800k / over-half captions + Verba title
 - [ ] 1 · Add patient
 - [ ] 2 · Upload → consent → creating → sample → phrases saving
-- [ ] 3 · Teach grid (+ picture-in-picture) → result card
+- [ ] 3 · Teach grid sped up (+ picture-in-picture, timer) → result card → "12% → 33%" bars graphic
 - [ ] 4 · Listen → "I'm thirsty", 70%+ → voice
 - [ ] 5 · "I'm scared", below 70% → blink-hold → voice
 - [ ] 6 · Wrong read → None of these → Likely → tap; blink scan → "When does the tube come out?"
